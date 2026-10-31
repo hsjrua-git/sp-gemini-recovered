@@ -1,8 +1,11 @@
 # Recovered application — completion record
 
-Date: 2026-10-31. Repository: `https://github.com/hsjrua-git/sp-gemini-2`.
+Date: 2026-10-31. Repository: `https://github.com/hsjrua-git/sp-gemini-recovered`.
 Branch: `recovery/glass-preview`. Foundation:
 `9167d998c361c33d73149c95d68a6cd4a0fe64ce`.
+
+The recovered edition has its own GitHub repository. The original
+`sp-gemini-2` remote is retained locally as `recovery-source`.
 
 The recovery implementation and verification are complete. This document is
 versioned with the recovered application. Method: foundation/snapshot diff
