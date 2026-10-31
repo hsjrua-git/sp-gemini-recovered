@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/AuthContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import ParameterForm from '../components/ParameterForm.jsx';
+import CreateSection from '../components/CreateSection.jsx';
 import ParametersTable from '../components/ParametersTable.jsx';
 
 // The parameter catalogue: code, name, and the shared integer range. There is
@@ -28,14 +29,13 @@ function ParametersPage() {
   }
 
   return (
-    <main>
+    <main className="wide">
       <h1>{t('parameters.title')}</h1>
       <p className="hint">{t('parameters.hint')}</p>
 
-      <section className="section-card">
-        <h2>{t('parameters.addTitle')}</h2>
+      <CreateSection title={t('parameters.addTitle')}>
         <ParameterForm />
-      </section>
+      </CreateSection>
 
       <section className="section-card">
         <h2>{t('parameters.allTitle')}</h2>

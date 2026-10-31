@@ -40,6 +40,9 @@ import {
   ScaleIcon,
   BotIcon,
   TranscriptIcon,
+  TaskTemplatesIcon,
+  AccountsTreeIcon,
+  FiscalPeriodIcon,
 } from '../components/icons.jsx';
 
 export const ROUTE_PERMISSIONS = {
@@ -96,7 +99,7 @@ export const NAV_PANELS = [
       { to: '/teachers', key: 'teachers', icon: TeacherIcon },
       { to: '/schedule', key: 'schedule', icon: CalendarIcon },
       { to: '/sessions', key: 'sessions', icon: SessionIcon },
-      { to: '/task-templates', key: 'taskTemplates', icon: EvaluateIcon },
+      { to: '/task-templates', key: 'taskTemplates', icon: TaskTemplatesIcon },
       { to: '/parameters', key: 'parameters', icon: ParametersIcon },
     ],
   },
@@ -114,9 +117,9 @@ export const NAV_PANELS = [
     key: 'accounting',
     items: [
       { to: '/accounting/journal', key: 'journal', icon: LedgerIcon },
-      { to: '/accounting/accounts', key: 'accounts', icon: LedgerIcon },
+      { to: '/accounting/accounts', key: 'accounts', icon: AccountsTreeIcon },
       { to: '/accounting/reports', key: 'accountingReports', icon: ScaleIcon },
-      { to: '/accounting/periods', key: 'periods', icon: ScaleIcon },
+      { to: '/accounting/periods', key: 'periods', icon: FiscalPeriodIcon },
     ],
   },
   {

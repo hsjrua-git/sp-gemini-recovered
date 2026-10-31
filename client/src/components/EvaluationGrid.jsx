@@ -36,14 +36,14 @@ const EvaluationRow = memo(function EvaluationRow({
 
   return (
     <tr className={target.isGroup ? 'group-row' : undefined}>
-      <td>
+      <th scope="row">
         {target.name}
         <div className="hint code">
           {target.isGroup
             ? t('evaluate.wholeGroup')
             : target.code ? formatStudentCode(target.code) : '—'}
         </div>
-      </td>
+      </th>
       {parameters.map((parameter) => {
         const key = cellKey(target.membershipId, parameter.id);
         const saved = savedByCell.get(key) ?? null;
@@ -106,8 +106,12 @@ const EvaluationRow = memo(function EvaluationRow({
                   onCellChange(key, { selected: event.target.checked })
                 }
               />
+              <label className="eval-dimension">
+              <span>{t('evaluate.quality')}</span>
               <input
+                id={`evaluation-${key}-quality`}
                 className={inputClasses(qualityError)}
+                aria-invalid={Boolean(qualityError)}
                 inputMode="numeric"
                 value={qualityShown}
                 disabled={!selected || locked}
@@ -126,8 +130,13 @@ const EvaluationRow = memo(function EvaluationRow({
                   })
                 }
               />
+              </label>
+              <label className="eval-dimension">
+              <span>{t('evaluate.quantity')}</span>
               <input
+                id={`evaluation-${key}-quantity`}
                 className={inputClasses(quantityError)}
+                aria-invalid={Boolean(quantityError)}
                 inputMode="numeric"
                 value={quantityShown}
                 disabled={!selected || locked}
@@ -146,6 +155,7 @@ const EvaluationRow = memo(function EvaluationRow({
                   })
                 }
               />
+              </label>
               {locked && (
                 <span className="lock" aria-hidden="true">
                   <LockIcon />
@@ -290,7 +300,7 @@ function EvaluationGrid({
   }
 
   return (
-    <div className="table-wrap">
+    <div className="table-wrap evaluation-table" tabIndex={0} role="region" aria-label={t('evaluate.title')}>
       <table className="grid">
         <thead>
           <tr>

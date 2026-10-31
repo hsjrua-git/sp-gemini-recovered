@@ -22,8 +22,7 @@ npm-debug.log*
 # Local agent-session artifacts (plans, scratch)
 .zcode/
 
-# Stray root stubs — the real manifests live in client/ and server/
-/package.json
+# Packages are installed independently; the root only coordinates commands.
 /package-lock.json
 
 # Scratch / working notes (not part of the project)
@@ -46,3 +45,7 @@ agent/logs/
 /evaluation database
 /backups/
 /VERSION-NOTES.md
+# Local recovered-project preview data and copied recovery evidence.
+.local/
+check/
+partly-schema/

@@ -6,9 +6,18 @@ import { LANGUAGES } from '../i18n/index.js';
 import { errorMessage } from '../i18n/errors.js';
 import { toggleHidden } from '../lib/prefs.js';
 import { usePreferences } from '../preferences/PreferencesContext.jsx';
+import { PERSIAN_FONTS } from '../lib/fonts.js';
 
 const THEMES = ['system', 'light', 'dark'];
 const PALETTES = [
+  {
+    value: 'aurum-glass',
+    preview: { paper: '#2b2d30', surface: '#46474999', line: '#ffffff24', spine: '#202224', brand: '#e7c567' },
+  },
+  {
+    value: 'aurum',
+    preview: { paper: '#282a2e', surface: '#36383c', line: '#45474b', spine: '#202124', brand: '#e7c567' },
+  },
   {
     value: 'aurora',
     preview: {
@@ -85,7 +94,7 @@ const SORTS = ['newest', 'oldest', 'name', 'code'];
 const TABS = ['overview', 'period', 'parameter'];
 
 function PreferencesPage() {
-  const { t } = useTranslation(['admin', 'common']);
+  const { t } = useTranslation(['admin', 'common', 'recovery']);
   const { preferences, update, reset } = usePreferences();
   const { can } = useAuth();
   // The "hide parameters from the overview" control only makes sense for a role
@@ -138,7 +147,7 @@ function PreferencesPage() {
   }
 
   return (
-    <main>
+    <main className="preferences-page">
       <h1>{t('preferences.title')}</h1>
       <p className="hint">{t('preferences.hint')}</p>
       <p role="status" className="status-line">
@@ -198,7 +207,7 @@ function PreferencesPage() {
                   </span>
                 </span>
                 <span className="palette-name">
-                  {t(`preferences.palettes.${option.value}`)}
+                  {['aurum', 'aurum-glass'].includes(option.value) ? t(`recovery:${option.value}`) : t(`preferences.palettes.${option.value}`)}
                 </span>
               </label>
             ))}
@@ -230,6 +239,27 @@ function PreferencesPage() {
                 {t(`common:language.${code}`)}
               </label>
             ))}
+          </div>
+        </fieldset>
+        <fieldset className="pref-group">
+          <legend>{t('recovery:font.title')}</legend>
+          <p className="hint">{t('recovery:font.hint')}</p>
+          <div className="font-choices">
+            {PERSIAN_FONTS.map(font => <label className="font-option" key={font.id} style={{ fontFamily: font.family }}>
+              <span className="tw:flex tw:items-center tw:gap-2">
+                <input type="radio" name="persianFont" value={font.id} checked={(preferences.persianFont ?? 'vazirmatn') === font.id} onChange={() => change({ persianFont: font.id })} />
+                <strong lang="fa">{font.name}</strong>
+                {font.id === 'vazirmatn' && <small>{t('recovery:font.recommended')}</small>}
+              </span>
+              <span className="font-sample" lang="fa" dir="rtl">هر روز، فرصتی برای یادگیری</span>
+              <span className="hint" lang="fa" dir="rtl">دانش‌آموزان · پیشرفت · ۱۲۳۴۵۶۷۸۹۰</span>
+            </label>)}
+          </div>
+        </fieldset>
+        <fieldset className="pref-group">
+          <legend>{t('recovery:cursor.title')}</legend>
+          <div className="segmented">
+            {[false, true].map(value => <label key={String(value)}><input type="radio" name="cursor" checked={(preferences.customCursor !== false) === value} onChange={() => change({ customCursor: value })} />{t(value ? 'recovery:cursor.wave' : 'recovery:cursor.native')}</label>)}
           </div>
         </fieldset>
       </section>

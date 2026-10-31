@@ -127,6 +127,8 @@ function preloadRoute(pathname) {
 // the host's own children when a page isn't wrapped (or we catch it mid-load).
 function pageRoot(host) {
   if (!host) return null;
+  const main = host.querySelector(':scope > main');
+  if (main) return main;
   if (host.children.length === 1 && host.children[0].children.length > 0) {
     return host.children[0];
   }
@@ -135,8 +137,9 @@ function pageRoot(host) {
 
 function sectionsOf(host) {
   const root = pageRoot(host);
-  if (!root) return [];
-  return Array.from(root.children).filter((el) => el.nodeType === 1);
+  if (!root || root.classList?.contains('page-loading')) return [];
+  return Array.from(root.children).filter((el) =>
+    el.nodeType === 1 && !el.classList?.contains('page-loading'));
 }
 
 function descriptorOf(el) {
@@ -277,7 +280,6 @@ function animateSectionIn(el, containerRect, order, sink) {
 // MOTION.lateCap. Returns a cleanup that cancels everything still in flight.
 function playEnter(host) {
   const anims = [];
-  const root = pageRoot(host);
   const animated = new WeakSet();
 
   const present = sectionsOf(host);
@@ -305,18 +307,12 @@ function playEnter(host) {
   };
 
   const observer =
-    root && typeof MutationObserver === 'function'
-      ? new MutationObserver((records) => {
+    host && typeof MutationObserver === 'function'
+      ? new MutationObserver(() => {
           if (stopped) return;
-          const fresh = [];
-          for (const record of records) {
-            for (const node of record.addedNodes) {
-              if (node.nodeType === 1 && node.parentElement === root && !animated.has(node)) {
-                animated.add(node);
-                fresh.push(node);
-              }
-            }
-          }
+          // A late lazy route can replace the loader and its entire root.
+          const fresh = sectionsOf(host).filter(node => !animated.has(node));
+          fresh.forEach(node => animated.add(node));
           if (fresh.length === 0) return;
           // The page may have grown as content landed, so re-measure the frame
           // before classifying the new sections by position.
@@ -326,7 +322,7 @@ function playEnter(host) {
         })
       : null;
   if (observer) {
-    observer.observe(root, { childList: true });
+    observer.observe(host, { childList: true, subtree: true });
     bump();
   }
 
@@ -425,14 +421,15 @@ function settleThenEnter(host, isFetching, superseded) {
     } catch {
       fetching = 0;
     }
-    if (fetching > 0) {
+    const hasLoader = host.querySelector('.page-loading') !== null;
+    if (fetching > 0 || hasLoader) {
       sawFetch = true;
       lastActivityAt = now;
     }
     // Gate 1: no fetch in flight (and one has run, or the grace has passed for a
     // static page). Gate 2: the DOM has been quiet since the last activity.
     const dataReady =
-      fetching === 0 && (sawFetch || now - startedAt >= MOTION.settleGrace);
+      !hasLoader && fetching === 0 && (sawFetch || now - startedAt >= MOTION.settleGrace);
     const quiet = now - lastActivityAt >= MOTION.settleQuiet;
     if (dataReady && quiet) {
       reveal(true);

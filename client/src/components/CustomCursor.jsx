@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { usePreferences } from '../preferences/PreferencesContext.jsx';
 
 // Workstream I — the glowing-dot cursor (reference 3 / CyFocus).
 //
@@ -203,5 +204,6 @@ function Cursor() {
 
 export default function CustomCursor() {
   const enabled = useCursorEnabled();
-  return enabled ? <Cursor /> : null;
+  const { preferences } = usePreferences();
+  return enabled && preferences.customCursor !== false ? <Cursor /> : null;
 }

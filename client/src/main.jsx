@@ -17,6 +17,9 @@ import './index.css';
 import App from './App.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import CustomCursor from './components/CustomCursor.jsx';
+import { applyRememberedFont } from './lib/fonts.js';
+
+applyRememberedFont();
 
 applyRememberedTheme();
 

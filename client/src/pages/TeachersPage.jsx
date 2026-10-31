@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import CreateSection from '../components/CreateSection.jsx';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
@@ -151,10 +152,9 @@ function TeachersPage() {
       </div>
 
       {can('teachers.manage') && editingId === null && (
-        <section className="section-card">
-          <h2>{t('teachers.addTitle')}</h2>
+        <CreateSection title={t('teachers.addTitle')}>
           <TeacherForm teacher={null} onDone={() => {}} />
-        </section>
+        </CreateSection>
       )}
 
       <section className="section-card">
@@ -231,7 +231,7 @@ function TeachersPage() {
                       </td>
                       <td>{teacher.nationalId}</td>
                       {can('teachers.manage') && (
-                        <td>
+                        <td className="actions">
                           {teacher.archivedAt ? (
                             <button
                               type="button"
@@ -253,7 +253,7 @@ function TeachersPage() {
                               </button>{' '}
                               <button
                                 type="button"
-                                className="quiet"
+                                className="danger"
                                 disabled={change}
                                 onClick={() => archive.mutate(teacher.id)}
                               >

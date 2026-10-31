@@ -265,7 +265,7 @@ function AccountingPeriodsPage() {
                     </td>
                     <td className="num">{period.postedEntryCount}</td>
                     {canAct && (
-                      <td>
+                      <td className="actions">
                         {period.status === 'open' ? (
                           <>
                             {canManage && (
@@ -283,7 +283,7 @@ function AccountingPeriodsPage() {
                             {canClose && (
                               <button
                                 type="button"
-                                className="quiet"
+                                className="danger"
                                 onClick={() => {
                                   if (window.confirm(t('periods.closeConfirm'))) {
                                     close.mutate(period.id);

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useEffectEvent, useRef } from 'react';
 import { createPortal } from 'react-dom';
 
 // The shared slide-over shell for the dashboard's detail drawers: a scrim plus a
@@ -19,6 +19,7 @@ import { createPortal } from 'react-dom';
 function Drawer({ open, titleId, onClose, children }) {
   const panelRef = useRef(null);
   const prevFocus = useRef(null);
+  const closeFromKeyboard = useEffectEvent(() => onClose());
 
   // Trap focus inside the panel while open; Escape closes it. On close (effect
   // cleanup) focus returns to whatever opened the drawer.
@@ -29,15 +30,15 @@ function Drawer({ open, titleId, onClose, children }) {
     if (!panel) return undefined;
 
     const focusable = () =>
-      panel.querySelectorAll(
-        'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'
-      );
+      [...panel.querySelectorAll(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary, [tabindex]:not([tabindex="-1"])'
+      )].filter(element => !element.closest('[inert]') && element.getClientRects().length > 0);
     (focusable()[0] ?? panel).focus();
 
     function handleKey(event) {
       if (event.key === 'Escape') {
         event.preventDefault();
-        onClose();
+        closeFromKeyboard();
         return;
       }
       if (event.key !== 'Tab') return;
@@ -69,7 +70,7 @@ function Drawer({ open, titleId, onClose, children }) {
       document.removeEventListener('keydown', handleKey);
       prevFocus.current?.focus?.();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   // Lock the page behind the modal so a scroll gesture moves the drawer's own
   // overflow, not the dashboard underneath it.

@@ -18,6 +18,7 @@ import { initDb } from '../db.js';
 import { resetLocalUser } from '../context.js';
 import { getEvaluations, saveEvaluationsBulk } from './evaluations.js';
 import { createParameter } from './parameters.js';
+import { homeOverview } from '../../lib/homeOverview.js';
 
 const migrationsDir = path.join(import.meta.dirname, '..', '..', 'db', 'migrations');
 
@@ -129,6 +130,57 @@ async function seedSchedule(pool) {
   ).rows[0].id;
   return { assignmentId, sessionId, sessionDate, groupId: group, memberships, ada, bob };
 }
+
+test('home overview respects the database day, selected-cell completion, exclusions and list limits', async () => {
+  const pool = await freshDb();
+  try {
+    await pool.query("SET TIME ZONE 'Asia/Tehran'");
+    const { assignmentId, sessionId } = await seedSchedule(pool);
+    const today = (await pool.query('SELECT CURRENT_DATE::text AS day')).rows[0].day;
+    const initial = await homeOverview(pool);
+    assert.equal(initial.today, today);
+    assert.equal(initial.timeZone, 'Asia/Tehran');
+    assert.equal(initial.studentCount, 2);
+    assert.equal(initial.gradingCount, 1);
+    const ids = [];
+    for (let i = 0; i < 10; i++) {
+      ids.push((await pool.query(`INSERT INTO sessions (assignment_id, planned_date, moved_to)
+        VALUES ($1, CURRENT_DATE + $2::int, CURRENT_DATE) RETURNING id`, [assignmentId, i + 10])).rows[0].id);
+    }
+    for (const [i, extra] of ['future', 'canceled', 'archived'].entries()) {
+      await pool.query(`INSERT INTO sessions (assignment_id, planned_date, moved_to, canceled_at, archived_at)
+        VALUES ($1, CURRENT_DATE + $3::int, CURRENT_DATE + CASE WHEN $2 = 'future' THEN 1 ELSE 0 END,
+          CASE WHEN $2 = 'canceled' THEN now() END, CASE WHEN $2 = 'archived' THEN now() END)`, [assignmentId, extra, i + 30]);
+    }
+    let home = await homeOverview(pool);
+    assert.equal(home.classCount, 10);
+    assert.equal(home.classes.length, 8);
+    assert.equal(home.gradingCount, 11);
+    assert.equal(home.grading.length, 8);
+    assert.equal(home.grading[0].id, sessionId);
+    const first = await createParameter({ code: 'home1', name: 'Home one', minValue: 0, maxValue: 100 });
+    const second = await createParameter({ code: 'home2', name: 'Home two', minValue: 0, maxValue: 100 });
+    await saveEvaluationsBulk({ sessionId: ids[0], entries: [{ parameterId: first.id, membershipId: null, selected: true, qualityValue: null, quantityValue: null, qualityComment: 'Comment-only answer' }] });
+    await saveEvaluationsBulk({ sessionId: ids[1], entries: [{ parameterId: first.id, membershipId: null, selected: true, qualityValue: null, quantityValue: null }] });
+    await saveEvaluationsBulk({ sessionId: ids[2], entries: [
+      { parameterId: first.id, membershipId: null, selected: true, qualityValue: 0, quantityValue: null },
+      { parameterId: second.id, membershipId: null, selected: true, qualityValue: null, quantityValue: null },
+    ] });
+    home = await homeOverview(pool);
+    assert.equal(home.gradingCount, 10);
+    assert.equal(home.partialCount, 1);
+    assert.equal(home.notStartedCount, 9);
+    const statuses = new Map(home.classes.map(row => [row.id, row.status]));
+    assert.equal(statuses.get(ids[0]), 'complete');
+    assert.equal(statuses.get(ids[1]), 'notStarted');
+    assert.equal(statuses.get(ids[2]), 'partial');
+    await pool.query('UPDATE assignments SET archived_at = now() WHERE id = $1', [assignmentId]);
+    home = await homeOverview(pool);
+    assert.equal(home.classCount, 0);
+    assert.equal(home.gradingCount, 0);
+    assert.deepEqual(home.classes, []);
+  } finally { await pool.end(); }
+});
 
 test('getEvaluations: needs a filter, validates ids, reads stored rows', async () => {
   const pool = await freshDb();

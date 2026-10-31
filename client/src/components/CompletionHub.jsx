@@ -49,7 +49,7 @@ function fieldLayout(count) {
 const SAT_R = 16;
 const SAT_C = 2 * Math.PI * SAT_R;
 
-function Satellite({ stat, total, index, onSelect }) {
+function Satellite({ stat, total, index, onSelect, compact }) {
   const { t } = useTranslation(['reports', 'common']);
   const { parameter, answeredCount } = stat;
   const count = answeredCount ?? stat.count;
@@ -65,7 +65,7 @@ function Satellite({ stat, total, index, onSelect }) {
     <li className="cohort-sat" style={{ '--i': index }}>
       <button
         type="button"
-        className={`sat-node${count === 0 ? ' empty' : ''}`}
+        className={`sat-node${count === 0 ? ' empty' : ''}${compact ? ' compact' : ''}`}
         title={label}
         aria-label={label}
         aria-haspopup="dialog"
@@ -85,11 +85,10 @@ function Satellite({ stat, total, index, onSelect }) {
             )}
           </svg>
           <span className="sat-frac">
-            {count}
-            <span className="sat-frac-total">/{total}</span>
+            {compact ? index + 1 : <>{count}<span className="sat-frac-total">/{total}</span></>}
           </span>
         </span>
-        <span className="sat-name">{parameter.name}</span>
+        {!compact && <span className="sat-name">{parameter.name}</span>}
       </button>
     </li>
   );
@@ -104,7 +103,7 @@ function Satellite({ stat, total, index, onSelect }) {
 // focal point — everything else stays quiet glass on the grey base. The three
 // field states reconcile exactly with the KPI totals because cohortField() and
 // summarize() classify against the same set of in-use parameters.
-function CompletionHub({ summary, field, stats = [], onSelect }) {
+function CompletionHub({ summary, field, stats = [], onSelect, compactSatellites = false, legend }) {
   const { t } = useTranslation(['reports', 'common']);
   const pct = summary.completion; // 0–100, or null when nothing is expected
   const hasPct = pct !== null;
@@ -199,12 +198,14 @@ function CompletionHub({ summary, field, stats = [], onSelect }) {
                 total={summary.students}
                 index={i}
                 onSelect={onSelect}
+                compact={compactSatellites}
               />
             ))}
           </ul>
         )}
       </div>
 
+      {legend}
       <ul className="cohort-kpis">
         {kpis.map((kpi) => (
           <li key={kpi.key} className="cohort-kpi">

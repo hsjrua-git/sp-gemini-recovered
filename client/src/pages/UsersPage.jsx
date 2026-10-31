@@ -6,6 +6,7 @@ import { useAuth } from '../auth/AuthContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import TemporaryPasswordNotice from '../components/TemporaryPasswordNotice.jsx';
 import UserForm from '../components/UserForm.jsx';
+import CreateSection from '../components/CreateSection.jsx';
 import UserRow from '../components/UserRow.jsx';
 import { errorMessage } from '../i18n/errors.js';
 
@@ -43,10 +44,9 @@ function UsersPage() {
         />
       )}
 
-      <section className="section-card">
-        <h2>{t('users.addTitle')}</h2>
+      <CreateSection title={t('users.addTitle')}>
         <UserForm onNotice={setNotice} />
-      </section>
+      </CreateSection>
 
       <section className="section-card">
         <h2>{t('users.allTitle')}</h2>

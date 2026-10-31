@@ -1,5 +1,9 @@
 import { request } from './http.js';
 
+export function getHomeOverview() {
+  return request('/api/dashboard/home');
+}
+
 // Cohort trend lines: the average of ONE dimension per (parameter, assignment,
 // period). Optional group scope narrows the roster tree.
 export async function getTrends({ groupId = null, dimension = 'quality' } = {}) {

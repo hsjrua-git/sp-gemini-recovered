@@ -18,23 +18,23 @@
 export const MOTION = {
   // The outgoing page clears quickly — it's the rebuild that should feel slow.
   exit: {
-    duration: 400,
-    stagger: 40,
+    duration: 180,
+    stagger: 12,
     maxStep: 5,
     easing: 'cubic-bezier(0.4, 0, 0.7, 0.25)',
   },
   // The incoming page rebuilds unhurriedly, section by section.
   enter: {
-    duration: 640,
-    stagger: 90,
+    duration: 420,
+    stagger: 24,
     maxStep: 6,
     easing: 'cubic-bezier(0.33, 1, 0.68, 1)',
   },
   // Buttons and fields inside an entering section, after the section itself.
   micro: {
-    duration: 380,
-    lead: 130,
-    stagger: 40,
+    duration: 220,
+    lead: 40,
+    stagger: 12,
     max: 8,
     easing: 'cubic-bezier(0.33, 1, 0.68, 1)',
   },
@@ -66,7 +66,7 @@ export const MOTION = {
 
 // How far sliding/rising sections travel. Kept modest so a slow clock reads as a
 // glide rather than a dart.
-const DIST = { x: 96, up: 40, down: 46 };
+const DIST = { x: 24, up: 14, down: 18 };
 
 // Classify one top-level section from its tag + class names. Order matters:
 // headings and control bars are recognised before the catch-all panel. Accepts a
@@ -143,7 +143,7 @@ function goneTransform(direction) {
       return `translateY(${DIST.down}px)`;
     case 'collapse':
     default:
-      return 'scale(0.9) translateY(10px)';
+      return 'scale(0.985) translateY(10px)';
   }
 }
 

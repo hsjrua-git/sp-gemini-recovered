@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router';
 import { AuthContext } from '../auth/AuthContext.jsx';
@@ -31,14 +31,14 @@ beforeEach(() => {
 });
 afterEach(() => { for (const client of clients.splice(0)) client.clear(); });
 
-function mount({ individual = false, blind = false, override = false } = {}) {
+function mount({ individual = false, blind = false, override = false, url = '/evaluate' } = {}) {
   mocks.assignments.mockResolvedValue([{ id: 'assignment', name: 'Test Assignment',
     groupId: individual ? null : 'group', groupName: 'Test Group',
     membershipId: individual ? student.membershipId : null,
     studentName: individual ? student.fullName : null }]);
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
   clients.push(client);
-  render(<QueryClientProvider client={client}><MemoryRouter>
+  render(<QueryClientProvider client={client}><MemoryRouter initialEntries={[url]}>
     <AuthContext value={{ can: key => key === 'scores.enter' || (!blind && key === 'scores.view') || (override && key === 'scores.override') }}>
       <EvaluatePage />
     </AuthContext>
@@ -106,4 +106,58 @@ test('locked edits require a written reason and discard clears it', async () => 
   expect(screen.getByRole('textbox', { name: /reason for changing/ }).value).toBe('');
   fireEvent.click(screen.getByRole('button', { name: /Discard/ }));
   expect(screen.queryByRole('textbox', { name: /reason for changing/ })).toBeNull();
+});
+
+function hideSpeed() {
+  const picker = screen.getByRole('group', { name: /Columns/ });
+  fireEvent.click(picker.querySelector('summary'));
+  fireEvent.click(within(picker).getByRole('checkbox', { name: 'Speed' }));
+}
+
+test.each([false, true])('hidden drafts are saved, including blind entry=%s', async blind => {
+  mount({ individual: true, blind });
+  fireEvent.click(await screen.findByRole('checkbox', { name: /Speed.*Test Student/ }));
+  fireEvent.change(screen.getByRole('textbox', { name: /Quality.*Speed.*Test Student/ }), { target: { value: '77' } });
+  hideSpeed();
+  expect(screen.queryByRole('textbox', { name: /Quality.*Speed.*Test Student/ })).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: /Save 1/ }));
+  await waitFor(() => expect(mocks.save).toHaveBeenCalledOnce());
+  expect(mocks.save.mock.calls[0][0].entries[0]).toMatchObject({ parameterId: 'parameter', qualityValue: 77 });
+});
+
+test('error navigation reveals a hidden column, focuses the invalid dimension, and works repeatedly', async () => {
+  const scroll = vi.fn();
+  const previous = HTMLElement.prototype.scrollIntoView;
+  HTMLElement.prototype.scrollIntoView = scroll;
+  try {
+    mount({ individual: true });
+    fireEvent.click(await screen.findByRole('checkbox', { name: /Speed.*Test Student/ }));
+    fireEvent.change(screen.getByRole('textbox', { name: /Quantity.*Speed.*Test Student/ }), { target: { value: '101' } });
+    hideSpeed();
+    expect(screen.getByRole('button', { name: /Save 1/ })).toBeDisabled();
+    const jump = screen.getByRole('button', { name: 'Go to the first error' });
+    fireEvent.click(jump);
+    const input = screen.getByRole('textbox', { name: /Quantity.*Speed.*Test Student/ });
+    await waitFor(() => expect(input).toHaveFocus());
+    expect(input).toHaveAttribute('aria-invalid', 'true');
+    jump.focus();
+    fireEvent.click(jump);
+    await waitFor(() => expect(input).toHaveFocus());
+    expect(scroll).toHaveBeenCalledTimes(2);
+    fireEvent.change(input, { target: { value: '80' } });
+    expect(screen.getByRole('button', { name: /Save 1/ })).toBeEnabled();
+  } finally { HTMLElement.prototype.scrollIntoView = previous; }
+});
+
+test('a dashboard deep link selects its session instead of the default', async () => {
+  mocks.sessions.mockResolvedValue({ sessions: [
+    { id: 'session', sessionDate: '2026-10-29' },
+    { id: 'linked', sessionDate: '2026-10-28' },
+  ] });
+  mount({ individual: true, url: '/evaluate?assignmentId=assignment&sessionId=linked' });
+  fireEvent.click(await screen.findByRole('checkbox', { name: /Speed.*Test Student/ }));
+  fireEvent.change(screen.getByRole('textbox', { name: /Quality.*Speed.*Test Student/ }), { target: { value: '70' } });
+  fireEvent.click(screen.getByRole('button', { name: /Save 1/ }));
+  await waitFor(() => expect(mocks.save).toHaveBeenCalledOnce());
+  expect(mocks.save.mock.calls[0][0].sessionId).toBe('linked');
 });

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { listEvaluations, saveEvaluations } from '../api/evaluations.js';
 import { listParameters } from '../api/parameters.js';
@@ -23,14 +23,18 @@ import { formatIsoDate, toIsoDate } from '../lib/format.js';
 import HierarchySelect from '../components/HierarchySelect.jsx';
 import EvaluationTasks from '../components/EvaluationTasks.jsx';
 import { assignmentTree } from '../lib/hierarchy.js';
+import TreePicker from '../components/TreePicker.jsx';
 
 function EvaluatePage() {
   const queryClient = useQueryClient();
-  const { t } = useTranslation(['students', 'common']);
+  const { t } = useTranslation(['students', 'common', 'recovery']);
   const { can } = useAuth();
 
-  const [assignmentId, setAssignmentId] = useState(null);
-  const [sessionId, setSessionId] = useState(null);
+  const [searchParams] = useSearchParams();
+  const [assignmentId, setAssignmentId] = useState(() => searchParams.get('assignmentId'));
+  const [sessionId, setSessionId] = useState(() => searchParams.get('sessionId'));
+  const [selectedParamIds, setSelectedParamIds] = useState(null);
+  const [errorFocus, setErrorFocus] = useState(null);
   const [drafts, setDrafts] = useState({});
   const [overrideReason, setOverrideReason] = useState('');
 
@@ -91,6 +95,16 @@ function EvaluatePage() {
     () => new Map(parameters.map((parameter) => [parameter.id, parameter])),
     [parameters]
   );
+  const visibleParameters = useMemo(() => selectedParamIds === null ? parameters : parameters.filter(parameter => selectedParamIds.includes(parameter.id)), [parameters, selectedParamIds]);
+
+  useEffect(() => {
+    if (!errorFocus) return;
+    const input = document.getElementById(`evaluation-${errorFocus.key}-${errorFocus.dimension}`);
+    if (input) {
+      input.scrollIntoView({ block: 'center', inline: 'center' });
+      input.focus({ preventScroll: true });
+    }
+  }, [errorFocus]);
 
   // Existing cells of this session. Blind-entry roles (scores.enter without
   // scores.view) never fetch them: their grid starts empty and the server
@@ -367,9 +381,9 @@ function EvaluatePage() {
   }
 
   return (
-    <main className="wide">
+    <main className="wide evaluate-page">
       <div className="page-head">
-        <h1>{t('evaluate.title')}</h1>
+        <div><p className="eyebrow">{t('recovery:evaluate.workspace')}</p><h1>{t('evaluate.title')}</h1><p className="hint">{t('recovery:evaluate.hint')}</p></div>
         {can('data.import') && (
           <div className="page-head-actions">
             <Link className="btn" to="/evaluate/import">
@@ -428,7 +442,7 @@ function EvaluatePage() {
         <textarea value={overrideReason} onChange={event => setOverrideReason(event.target.value)} minLength={5} maxLength={300} rows={2} disabled={mutation.isPending} />
       </label>}
       {!canViewScores && <p className="hint">{t('evaluate.blindHint')}</p>}
-      {effectiveSession && <EvaluationTasks key={effectiveSession.id} session={effectiveSession} sessions={sessions} />}
+      {effectiveSession && <details className="panel evaluation-tasks-disclosure"><summary>{t('recovery:evaluate.tasks')}</summary><EvaluationTasks key={effectiveSession.id} session={effectiveSession} sessions={sessions} /></details>}
       <p className="hint">
         {t('evaluate.lockHint')}
         {can('scores.override')
@@ -436,9 +450,15 @@ function EvaluatePage() {
           : t('evaluate.lockHintNoOverride')}
       </p>
 
-      {hasLiveErrors && (
+      {Object.keys(cellErrors).length > 0 && (
         <p className="error" role="alert">
           {t('evaluate.fixCells')}
+          {' '}<button type="button" onClick={() => {
+            const key = Object.keys(cellErrors)[0];
+            const { parameterId } = splitCellKey(key);
+            setSelectedParamIds(current => current === null || current.includes(parameterId) ? current : [...current, parameterId]);
+            setErrorFocus({ key, dimension: cellErrors[key].quantity && !cellErrors[key].quality ? 'quantity' : 'quality' });
+          }}>{t('recovery:evaluate.showError')}</button>
         </p>
       )}
       {mutation.isError && (
@@ -468,15 +488,22 @@ function EvaluatePage() {
         <p className="hint">{t('common:status.loading')}</p>
       )}
       {effectiveSessionId !== null && !isLoading && !loadError && (
+        <>
+        <section className="section-card evaluation-picker">
+          <div><h2>{t('recovery:evaluate.parameters')}</h2><p className="hint">{t('recovery:evaluate.visibilityHint')}</p></div>
+          <TreePicker label={t('recovery:evaluate.columns', { shown: visibleParameters.length, total: parameters.length })} items={parameters} value={visibleParameters.map(p => p.id)} onChange={setSelectedParamIds} includeBranch />
+          {selectedParamIds !== null && <button type="button" className="quiet" onClick={() => setSelectedParamIds(null)}>{t('recovery:evaluate.showAll')}</button>}
+        </section>
         <EvaluationGrid
           targets={targets}
-          parameters={parameters}
+          parameters={visibleParameters}
           savedByCell={savedByCell}
           drafts={drafts}
           cellErrors={cellErrors}
           onCellChange={handleCellChange}
           canOverride={can('scores.override')}
         />
+        </>
       )}
     </main>
   );

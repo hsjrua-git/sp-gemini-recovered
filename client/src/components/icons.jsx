@@ -381,3 +381,15 @@ export function SignOutIcon(props) {
     </Svg>
   );
 }
+// Distinct navigation marks for templates, account hierarchy and fiscal dates.
+export function TaskTemplatesIcon(props) {
+  return <Svg {...props}><rect x="4" y="4" width="13" height="14" rx="2" /><path d="M8 20h10a2 2 0 0 0 2-2V8M7.5 9l1.5 1.5 3-3M7.5 14h6.5" /></Svg>;
+}
+
+export function AccountsTreeIcon(props) {
+  return <Svg {...props}><rect x="3.5" y="3.5" width="6" height="4.5" rx="1" /><path d="M6.5 8v10.5M6.5 12h4.5M6.5 18.5h4.5" /><rect x="11" y="9.8" width="9.5" height="4.4" rx="1" /><rect x="11" y="16.3" width="9.5" height="4.4" rx="1" /></Svg>;
+}
+
+export function FiscalPeriodIcon(props) {
+  return <Svg {...props}><path d="M11 19.5H5a1.5 1.5 0 0 1-1.5-1.5V6.5A1.5 1.5 0 0 1 5 5h13a1.5 1.5 0 0 1 1.5 1.5V11M3.5 9h16M8 3v3.5M15 3v3.5" /><circle cx="16.8" cy="16.8" r="4.2" /><path d="M16.8 14.8v2.1l1.4 1" /></Svg>;
+}

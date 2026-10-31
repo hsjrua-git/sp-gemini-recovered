@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import CreateSection from '../components/CreateSection.jsx';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/AuthContext.jsx';
@@ -150,6 +151,7 @@ function FieldRow({ field }) {
       <td className="actions">
         <button
           type="button"
+          className="danger"
           onClick={() => {
             if (
               window.confirm(t('fields.archiveConfirm', { label: field.label }))
@@ -195,10 +197,9 @@ function FieldsPage() {
       <h1>{t('fields.title')}</h1>
       <p className="hint">{t('fields.hint')}</p>
 
-      <section className="section-card">
-        <h2>{t('fields.addTitle')}</h2>
+      <CreateSection title={t('fields.addTitle')}>
         <NewFieldForm />
-      </section>
+      </CreateSection>
 
       <section className="section-card">
         <h2>{t('fields.listTitle')}</h2>

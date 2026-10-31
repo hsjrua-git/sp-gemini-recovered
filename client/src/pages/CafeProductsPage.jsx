@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import CreateSection from '../components/CreateSection.jsx';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
@@ -309,7 +310,9 @@ function CafeProductsPage() {
         <h2>{t('products.title')}</h2>
 
         {canManageProducts && editingProductId === null && (
-          <ProductForm product={null} onDone={() => {}} />
+          <CreateSection title={t('products.addSubmit')}>
+            <ProductForm product={null} onDone={() => {}} />
+          </CreateSection>
         )}
 
         {productsQuery.isPending && (
@@ -374,7 +377,7 @@ function CafeProductsPage() {
                     </td>
                     <td>{t(product.isActive ? 'status.active' : 'status.inactive')}</td>
                     {canManageProducts && (
-                      <td>
+                      <td className="actions">
                         {product.isActive ? (
                           <>
                             <button
@@ -387,7 +390,7 @@ function CafeProductsPage() {
                             </button>{' '}
                             <button
                               type="button"
-                              className="quiet"
+                              className="danger"
                               disabled={productChange}
                               onClick={() => deactivateProduct.mutate(product.id)}
                             >
@@ -427,7 +430,9 @@ function CafeProductsPage() {
           <h2>{t('suppliers.title')}</h2>
 
           {editingSupplierId === null && (
-            <SupplierForm supplier={null} onDone={() => {}} />
+            <CreateSection title={t('suppliers.addSubmit')}>
+              <SupplierForm supplier={null} onDone={() => {}} />
+            </CreateSection>
           )}
 
           {suppliersQuery.isPending && (
@@ -479,7 +484,7 @@ function CafeProductsPage() {
                       <td>
                         {t(supplier.isActive ? 'status.active' : 'status.inactive')}
                       </td>
-                      <td>
+                      <td className="actions">
                         {supplier.isActive ? (
                           <>
                             <button
@@ -492,7 +497,7 @@ function CafeProductsPage() {
                             </button>{' '}
                             <button
                               type="button"
-                              className="quiet"
+                              className="danger"
                               disabled={supplierChange}
                               onClick={() =>
                                 deactivateSupplier.mutate(supplier.id)

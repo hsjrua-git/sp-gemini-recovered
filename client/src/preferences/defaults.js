@@ -2,6 +2,8 @@ export const DEFAULT_PREFERENCES = {
   theme: 'dark',
   palette: 'aurora',
   language: 'fa',
+  persianFont: 'vazirmatn',
+  customCursor: true,
   studentsPageSize: 25,
   studentsSort: 'newest',
   studentsShowCode: true,

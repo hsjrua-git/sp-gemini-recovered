@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import CreateSection from '../components/CreateSection.jsx';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
@@ -93,8 +94,7 @@ function NewEntryForm({ accounts }) {
   }
 
   return (
-    <section className="section-card">
-      <h2>{t('newEntry')}</h2>
+    <CreateSection title={t('newEntry')}>
       <form onSubmit={handleSubmit} className="edit-form">
         <div className="row">
           <label htmlFor="journal-entry-date">{t('entryDate')}</label>
@@ -201,7 +201,7 @@ function NewEntryForm({ accounts }) {
           </p>
         )}
       </form>
-    </section>
+    </CreateSection>
   );
 }
 
@@ -365,7 +365,7 @@ function JournalList({ accounts, canPost }) {
                     </span>
                   </td>
                   {canPost && (
-                    <td>
+                    <td className="actions">
                       {entry.status === 'draft' && (
                         <button
                           type="button"
@@ -384,7 +384,7 @@ function JournalList({ accounts, canPost }) {
                         !['opening', 'closing'].includes(entry.sourceType) && (
                         <button
                           type="button"
-                          className="quiet"
+                          className="danger"
                           onClick={() => {
                             if (window.confirm(t('actions.voidConfirm'))) {
                               voidIt.mutate(entry.id);

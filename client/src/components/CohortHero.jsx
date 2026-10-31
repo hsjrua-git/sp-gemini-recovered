@@ -51,24 +51,24 @@ export default function CohortHero(props) {
   const stats = useMemo(() => (props.stats ?? []).filter(stat => stat.parameter?.inUse), [props.stats]);
   const pageIndex = Math.min(page, Math.max(0, Math.ceil(stats.length / ORBITS_PER_PAGE) - 1));
   const visibleStats = useMemo(() => stats.slice(pageIndex * ORBITS_PER_PAGE, (pageIndex + 1) * ORBITS_PER_PAGE), [stats, pageIndex]);
-
-  if (!use3d) {
-    return <CompletionHub {...props} />;
-  }
+  const legend = <ol className="orbit-legend">
+    {visibleStats.map((stat, index) => <li key={stat.parameter.id}><button type="button" className="quiet" onClick={() => props.onSelect?.({ type: 'parameter', id: stat.parameter.id })} aria-haspopup="dialog"><span className="orbit-number">{index + 1}</span>{t('workflows:orbits.details', { name: stat.parameter.name, pct: props.field.length ? Math.round(100 * (stat.answeredCount ?? stat.count) / props.field.length) : 0 })}</button></li>)}
+  </ol>;
 
   return (
+    <>
+    {!use3d ? <CompletionHub {...props} stats={visibleStats} compactSatellites legend={legend} /> :
     <Suspense fallback={<section className="cohort-hero cohort-loading" aria-busy="true" role="status"><span className="spinner" aria-hidden="true" />{t('common:status.loading')}</section>}>
       <section className="cohort-hero" aria-label={t('cohort.heroLabel')}>
         <CohortConstellation {...props} stats={visibleStats} autoRotate={Boolean(props.autoRotate) && !reduced} />
-        {stats.length > ORBITS_PER_PAGE && <nav className="orbit-pages" aria-label={t('workflows:orbits.parameters')}>
-          <button type="button" className="quiet" disabled={pageIndex === 0} onClick={() => setPage(pageIndex - 1)}>{t('workflows:orbits.previous')}</button>
-          <span role="status">{t('workflows:orbits.page', { from: pageIndex * ORBITS_PER_PAGE + 1, to: Math.min((pageIndex + 1) * ORBITS_PER_PAGE, stats.length), total: stats.length })}</span>
-          <button type="button" className="quiet" disabled={(pageIndex + 1) * ORBITS_PER_PAGE >= stats.length} onClick={() => setPage(pageIndex + 1)}>{t('workflows:orbits.next')}</button>
-        </nav>}
-        <ol className="orbit-legend">
-          {visibleStats.map((stat, index) => <li key={stat.parameter.id}><button type="button" className="quiet" onClick={() => props.onSelect?.({ type: 'parameter', id: stat.parameter.id })} aria-haspopup="dialog"><span className="orbit-number">{index + 1}</span>{t('workflows:orbits.details', { name: stat.parameter.name, pct: props.field.length ? Math.round(100 * (stat.answeredCount ?? stat.count) / props.field.length) : 0 })}</button></li>)}
-        </ol>
+        {legend}
       </section>
-    </Suspense>
+    </Suspense>}
+    {stats.length > ORBITS_PER_PAGE && <nav className="orbit-pages" aria-label={t('workflows:orbits.parameters')}>
+      <button type="button" className="quiet" disabled={pageIndex === 0} onClick={() => setPage(pageIndex - 1)}>{t('workflows:orbits.previous')}</button>
+      <span role="status">{t('workflows:orbits.page', { from: pageIndex * ORBITS_PER_PAGE + 1, to: Math.min((pageIndex + 1) * ORBITS_PER_PAGE, stats.length), total: stats.length })}</span>
+      <button type="button" className="quiet" disabled={(pageIndex + 1) * ORBITS_PER_PAGE >= stats.length} onClick={() => setPage(pageIndex + 1)}>{t('workflows:orbits.next')}</button>
+    </nav>}
+    </>
   );
 }

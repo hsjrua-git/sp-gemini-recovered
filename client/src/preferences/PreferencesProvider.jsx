@@ -9,6 +9,7 @@ import {
 import { useAuth } from '../auth/AuthContext.jsx';
 import { setLanguage } from '../i18n/index.js';
 import { applyPalette, applyTheme } from '../lib/theme.js';
+import { applyPersianFont } from '../lib/fonts.js';
 import { DEFAULT_PREFERENCES } from './defaults.js';
 import { PreferencesContext } from './PreferencesContext.jsx';
 
@@ -34,6 +35,10 @@ export function PreferencesProvider({ children }) {
   const ready = !enabled || query.isSuccess || query.isError;
 
   const theme = query.data?.theme;
+  const persianFont = query.data?.persianFont;
+  useEffect(() => {
+    if (persianFont) applyPersianFont(persianFont);
+  }, [persianFont]);
   useEffect(() => {
     if (theme) applyTheme(theme);
   }, [theme]);

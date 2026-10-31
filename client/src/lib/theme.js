@@ -16,6 +16,8 @@ const PALETTES = [
   'meadow',
   'cobalt',
   'crimson',
+  'aurum',
+  'aurum-glass',
 ];
 
 export function normalizeTheme(value) {

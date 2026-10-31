@@ -37,6 +37,8 @@
     "write-excel-file": "4.1.1"
   },
   "devDependencies": {
+    "@tailwindcss/postcss": "4.3.3",
+    "tailwindcss": "4.3.3",
     "@capacitor/cli": "^7.6.9",
     "@eslint/js": "^10.0.1",
     "@testing-library/jest-dom": "^6.6.3",

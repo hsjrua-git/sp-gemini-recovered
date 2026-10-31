@@ -182,7 +182,7 @@ function MappingRow({ mapping, accounts, canManage }) {
               {t('mappings.active')}
             </label>
           </td>
-          <td>
+          <td className="actions">
             <button
               type="button"
               className="quiet"
@@ -309,7 +309,7 @@ function AccountingAccountsPage() {
                     <td>{t(`types.${account.type}`)}</td>
                     <td>{account.isActive ? '✓' : '—'}</td>
                     {canManage && (
-                      <td>
+                      <td className="actions">
                         <button
                           type="button"
                           className="quiet"
@@ -321,7 +321,7 @@ function AccountingAccountsPage() {
                         {account.isActive && (
                           <button
                             type="button"
-                            className="quiet"
+                            className="danger"
                             onClick={() => deactivate.mutate(account.id)}
                             disabled={deactivate.isPending || account.isSystem}
                           >

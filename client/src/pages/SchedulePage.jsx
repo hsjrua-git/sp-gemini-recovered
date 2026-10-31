@@ -22,6 +22,7 @@ import { formatIsoDate, toIsoDate } from '../lib/format.js';
 import { useDebouncedValue } from '../lib/useDebouncedValue.js';
 import { errorMessage } from '../i18n/errors.js';
 import MultiAssignmentForm from '../components/MultiAssignmentForm.jsx';
+import CreateSection from '../components/CreateSection.jsx';
 
 // The schedule lists recurring assignments: a teacher meets a group (or one
 // student) on an interval from an anchor date. Sessions are generated from
@@ -431,7 +432,7 @@ function IntervalsManager({ intervals }) {
               <tr key={interval.id} className={interval.archivedAt ? 'stale' : undefined}>
                 <th scope="row">{interval.name}</th>
                 <td>{formatEvery(interval.every, t)}</td>
-                <td>
+                <td className="actions">
                   {interval.archivedAt ? (
                     <button
                       type="button"
@@ -444,7 +445,7 @@ function IntervalsManager({ intervals }) {
                   ) : (
                     <button
                       type="button"
-                      className="quiet"
+                      className="danger"
                       onClick={() => archive.mutate(interval.id)}
                       disabled={archive.isPending || restore.isPending}
                     >
@@ -458,6 +459,7 @@ function IntervalsManager({ intervals }) {
         </table>
       </div>
 
+      <CreateSection title={t('schedule.intervals.add')}>
       <form onSubmit={handleSubmit} className="edit-form">
         <label htmlFor="interval-name">
           {t('schedule.intervals.newName')}
@@ -503,6 +505,7 @@ function IntervalsManager({ intervals }) {
           <p className="error">{errorMessage(save.error)}</p>
         )}
       </form>
+      </CreateSection>
     </section>
   );
 }
@@ -569,8 +572,7 @@ function SchedulePage() {
       </div>
 
       {canUseForm && editingId === null && (
-        <section className="section-card">
-          <h2>{t('schedule.addTitle')}</h2>
+        <CreateSection title={t('schedule.addTitle')}>
           <MultiAssignmentForm
             assignment={null}
             teachers={teachersQuery.data ?? []}
@@ -578,7 +580,7 @@ function SchedulePage() {
             groups={groupsQuery.data ?? []}
             onDone={() => {}}
           />
-        </section>
+        </CreateSection>
       )}
 
       <section className="section-card">
@@ -671,7 +673,7 @@ function SchedulePage() {
                           : '—'}
                       </td>
                       {canManage && (
-                        <td>
+                        <td className="actions">
                           {assignment.archivedAt ? (
                             <button
                               type="button"
@@ -693,7 +695,7 @@ function SchedulePage() {
                               </button>{' '}
                               <button
                                 type="button"
-                                className="quiet"
+                                className="danger"
                                 onClick={() => runAction(archive, assignment.id)}
                                 disabled={archive.isPending || restore.isPending}
                               >

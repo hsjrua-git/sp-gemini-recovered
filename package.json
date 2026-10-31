@@ -1,0 +1,13 @@
+{
+  "name": "student-panel-recovered",
+  "private": true,
+  "type": "module",
+  "engines": { "node": "^20.19.0 || >=22.12.0" },
+  "scripts": {
+    "start": "node scripts/start.mjs",
+    "build": "npm --prefix client run build",
+    "lint": "npm --prefix client run lint",
+    "test": "npm --prefix server test && npm --prefix server run test:core && npm --prefix client test && npm --prefix agent test",
+    "seed-sample": "npm --prefix server run seed-sample"
+  }
+}

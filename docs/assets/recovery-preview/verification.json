@@ -1,0 +1,106 @@
+{
+  "date": "2026-10-31",
+  "branch": "recovery/glass-preview",
+  "foundation": "9167d998c361c33d73149c95d68a6cd4a0fe64ce",
+  "environment": {
+    "application": "http://127.0.0.1:3390",
+    "database": "student_panel_preview",
+    "postgresMajor": 16,
+    "databasePort": 5488,
+    "databaseTimeZone": "Asia/Tehran",
+    "sampleStudents": 30,
+    "sampleGroups": 4,
+    "sampleTeachers": 3,
+    "sampleAssignments": 5,
+    "sampleSessions": 71,
+    "sampleAnsweredPeriods": 13,
+    "sampleEvaluationCells": 573
+  },
+  "automatedChecks": {
+    "lint": "passed",
+    "productionBuild": "passed",
+    "rootSuite": {
+      "serverUnitPassed": 156,
+      "corePassed": 58,
+      "clientPassed": 250,
+      "agentPassed": 37,
+      "totalPassed": 501,
+      "failed": 0,
+      "gatedIntegrationSkips": 6
+    },
+    "finalClientRerun": { "filesPassed": 32, "testsPassed": 250, "failed": 0 },
+    "separatePostgresPermissions": { "passed": 6, "failed": 0, "skipped": 0 },
+    "pglite": { "migrationsApplied": 37, "sanityChecks": "passed" },
+    "diffWhitespace": "passed"
+  },
+  "routeSweeps": [
+    {
+      "language": "fa",
+      "theme": "dark",
+      "widths": [1280, 768, 390],
+      "routes": 31,
+      "observations": 93,
+      "creationForms": "measured closed and expanded",
+      "boundaryCrashes": 0,
+      "consoleErrors": 0,
+      "httpErrors": 0,
+      "initialOverflowCases": [
+        { "route": "/evaluate", "width": 768, "overflowPixels": 118 },
+        { "route": "/evaluate", "width": 390, "overflowPixels": 481 }
+      ],
+      "overflowRetests": "both passed with zero document overflow"
+    },
+    {
+      "language": "en",
+      "theme": "light",
+      "widths": [390],
+      "routes": 31,
+      "observations": 31,
+      "creationForms": "measured closed and expanded",
+      "boundaryCrashes": 0,
+      "consoleErrors": 0,
+      "httpErrors": 0,
+      "initialOverflowCases": [
+        { "route": "/accounting/reports", "width": 390, "overflowPixels": 14 }
+      ],
+      "overflowRetests": "accounting reports and Evaluate passed with zero document overflow"
+    }
+  ],
+  "routes": [
+    "/dashboard", "/students", "/students/:id", "/evaluate", "/parameters",
+    "/results", "/export", "/students/import", "/evaluate/import", "/users",
+    "/roles", "/groups", "/fields", "/teachers", "/schedule", "/sessions",
+    "/task-templates", "/cafe", "/cafe/products", "/cafe/purchases",
+    "/cafe/inventory", "/cafe/reports", "/accounting/journal",
+    "/accounting/accounts", "/accounting/periods", "/accounting/reports",
+    "/agent", "/agent/transcripts", "/preferences", "/change-password", "/audit"
+  ],
+  "liveWorkflowChecksPassed": [
+    "Home, Cafe and accounting totals matched independent SQL",
+    "Home loading, simulated error and retry states",
+    "Dashboard-to-Evaluate assignment/session links",
+    "Hidden evaluation drafts and repeatable invalid-dimension focus",
+    "2D side legend and 3D lower legend; six-orbit pagination",
+    "Bundled font loading and persisted font selection",
+    "Restricted-role Dashboard and financial visibility",
+    "390px drawer focus trap and Escape restoration",
+    "390px collapsed form draft retention",
+    "390px Jalali/Gregorian selection and focus restoration",
+    "SPA route visibility and Not Found rendering",
+    "Keyboard rail tooltip after automatic navigation scrolling"
+  ],
+  "preservation": {
+    "unchangedFoundationMigrations": 37,
+    "matchingSnapshotFiles": 1525,
+    "matchingPartialSchemaFiles": 3
+  },
+  "rawEvidenceDirectory": ".local/recovery-verification/",
+  "limits": [
+    "Phone coverage uses Chromium emulation, not a physical Android device",
+    "No new full real-PostgreSQL concurrency certification",
+    "No fresh accounting/Cafe mutation-smoke certification",
+    "No Windows/macOS launcher run",
+    "No new Lighthouse/performance score or exhaustive accessibility certification",
+    "Route sweeps are not exhaustive write-through tests of every form"
+  ]
+}

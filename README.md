@@ -11,8 +11,26 @@ by configurable roles built from fine-grained permissions.
 - `deploy/` — backup/restore scripts, systemd units, and an example reverse-proxy
   config for running it for real.
 
+## Recovered edition
+
+Branch `recovery/glass-preview` builds on `9167d99`, with selected improvements
+from recovery snapshot `2`. The recovery record, source-selection inventory,
+screenshots, and verification results are in
+[docs/recovery-preview-2026-10-31.md](docs/recovery-preview-2026-10-31.md).
+
+Once the packages, PostgreSQL database, migrations, and `server/.env` are ready,
+run **`npm start` from the repository root**. It builds the client first and
+starts the Express server only if that build succeeds. Dependencies remain
+installed separately in `server/` and `client/`; the root package coordinates
+commands. First-time installation is described below.
+
 ## What you can do
 
+- **Home overview** — a bounded 2D/3D progress chart above today's classes,
+  grading queue, student count, permission-aware quick actions, Cafe/accounting
+  snapshots, alerts, and a collapsible setup guide. Operational totals follow
+  the database's local day independently of chart filters. The 2D legend sits
+  beside the chart on desktop; 3D labels sit underneath.
 - **Students** — add, edit, archive; give each one custom fields (see below);
   organise them into groups.
 - **Parameters** — coded dimensions such as Speed or Rhythm, with optional
@@ -24,7 +42,9 @@ by configurable roles built from fine-grained permissions.
 - **Evaluate** — select expected cells and enter quality, quantity, and a short
   comment per dimension for one session. Cells lock from the session date
   (seven days for current/future sessions, one day for past sessions); override
-  requires a written audited reason.
+  requires a written audited reason. Hierarchical column selection preserves
+  hidden drafts; error navigation reveals and focuses invalid input. Class
+  links from Home select the corresponding assignment and session.
 - **Results & Dashboard** — assignment-period results, trends, and a persisted
   2D/3D cohort constellation, filterable by group and exportable.
 - **Groups** — nest students into groups and subgroups to any depth. Filtering
@@ -38,6 +58,11 @@ by configurable roles built from fine-grained permissions.
 - **Bilingual, Persian-first** — the whole interface is Persian/English
   (Persian default) with RTL layout and both Jalali and Gregorian calendars
   side by side; dates are entered in either calendar and stored as ISO.
+- **Personal appearance** — locally bundled Vazirmatn, Estedad, Shabnam, and
+  Sahel fonts; Aurum and transparent Aurum Glass palettes; light/dark themes;
+  and a system or decorative pointer. Choices persist per account.
+- **Management pages** — compact, collapsible add forms keep unfinished input
+  when closed, with clearer row actions and a labelled icon rail.
 - **Teaching** — teachers, recurring assignments (every N days/months),
   generated sessions with move/cancel/archive, session tasks and reusable
   task templates, and incomplete-session alerts surfaced on the dashboard.
@@ -173,19 +198,25 @@ cd client && npm run dev
 ## Running it for real (single process)
 
 In production the backend serves the built front end, so there is only one
-thing to run. Build the client once, then start the server; if
-`client/dist/index.html` exists, the server serves it and sends unknown
-non-API paths to the app for client-side routing.
+thing to run. From the repository root:
 
 ```bash
-# Build the front end.
-cd client && npm run build
-
-# Start the one process (reads server/.env).
-cd ../server && npm start
+npm start
 ```
 
-Open `http://<this-machine>:3000`.
+This rebuilds the client and starts the server using `server/.env`. PostgreSQL
+must already be running and migrations applied. The launcher does not provision
+accounts or a database. For deployment systems that build separately, use:
+
+```bash
+npm run build
+npm --prefix server start
+```
+
+If `client/dist/index.html` exists, the server serves it and sends unknown
+non-API paths to the app for client-side routing.
+
+Open `http://<this-machine>:3000`, or the configured `PORT`.
 
 ### Updating an existing installation
 
@@ -324,6 +355,16 @@ A few defences worth knowing about when running this beyond a trusted LAN:
   roles; the reporting role cannot read users, sessions, or secrets.
 
 ## Tests
+
+From the repository root:
+
+```bash
+npm run lint
+npm test          # server unit + core, client, and agent suites
+npm run build
+```
+
+Package-level commands and additional database checks:
 
 ```bash
 cd server && npm test                 # server unit tests (node:test)

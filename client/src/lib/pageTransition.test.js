@@ -113,7 +113,7 @@ describe('keyframes', () => {
     const kf = exitKeyframes('right');
     expect(kf).toHaveLength(2);
     expect(kf[0]).toMatchObject({ opacity: 1, transform: 'none', offset: 0 });
-    expect(kf[1]).toMatchObject({ opacity: 0, transform: 'translateX(96px)', offset: 1 });
+    expect(kf[1]).toMatchObject({ opacity: 0, transform: 'translateX(24px)', offset: 1 });
     // Transform + opacity only — deliberately no `filter: blur()`. A filter on a
     // section container becomes a backdrop root and kills the frosted glass of
     // its `.stat-card`/`.param-card`/`.panel` children mid-animation.
@@ -123,7 +123,7 @@ describe('keyframes', () => {
 
   it('enter is the mirror of exit — from gone back to resting', () => {
     const kf = enterKeyframes('left');
-    expect(kf[0]).toMatchObject({ opacity: 0, transform: 'translateX(-96px)', offset: 0 });
+    expect(kf[0]).toMatchObject({ opacity: 0, transform: 'translateX(-24px)', offset: 0 });
     expect(kf[1]).toMatchObject({ opacity: 1, transform: 'none', offset: 1 });
   });
 
@@ -131,11 +131,11 @@ describe('keyframes', () => {
     // A section leaves and returns along the same line, so exit[1] and enter[0]
     // must carry the same transform for a given direction.
     const cases = {
-      right: 'translateX(96px)',
-      left: 'translateX(-96px)',
-      up: 'translateY(-40px)',
-      down: 'translateY(46px)',
-      collapse: 'scale(0.9) translateY(10px)',
+      right: 'translateX(24px)',
+      left: 'translateX(-24px)',
+      up: 'translateY(-14px)',
+      down: 'translateY(18px)',
+      collapse: 'scale(0.985) translateY(10px)',
     };
     for (const [dir, transform] of Object.entries(cases)) {
       expect(exitKeyframes(dir)[1].transform).toBe(transform);
@@ -144,7 +144,7 @@ describe('keyframes', () => {
   });
 
   it('an unknown direction falls back to collapse', () => {
-    expect(exitKeyframes('sideways')[1].transform).toBe('scale(0.9) translateY(10px)');
+    expect(exitKeyframes('sideways')[1].transform).toBe('scale(0.985) translateY(10px)');
   });
 });
 

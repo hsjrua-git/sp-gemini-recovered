@@ -2,8 +2,13 @@ import { Router } from 'express';
 import pool from '../db/pool.js';
 import { descendantGroupIds } from '../lib/groups.js';
 import { isUuid } from '../lib/ids.js';
+import { homeOverview } from '../lib/homeOverview.js';
 
 const router = Router();
+
+router.get('/home', async (req, res) => {
+  res.json(await homeOverview(pool));
+});
 
 // Cohort trend lines: average of one dimension per (parameter, assignment,
 // period). The client labels each point with the assignment + period and can

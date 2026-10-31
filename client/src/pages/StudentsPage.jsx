@@ -8,6 +8,7 @@ import ExportButton from '../components/ExportButton.jsx';
 import ExportLink from '../components/ExportLink.jsx';
 import GroupFilter from '../components/GroupFilter.jsx';
 import StudentForm from '../components/StudentForm.jsx';
+import CreateSection from '../components/CreateSection.jsx';
 import StudentsTable from '../components/StudentsTable.jsx';
 import { studentsCsvRows } from '../lib/exports.js';
 import { toIsoDate } from '../lib/format.js';
@@ -48,7 +49,7 @@ function StudentsPage() {
   }
 
   return (
-    <main>
+    <main className="wide">
       <div className="page-head">
         <h1>{t('list.title')}</h1>
         {can('data.import') && (
@@ -60,10 +61,9 @@ function StudentsPage() {
         )}
       </div>
       {can('students.create') && (
-        <section className="section-card">
-          <h2>{t('list.addTitle')}</h2>
+        <CreateSection title={t('list.addTitle')}>
           <StudentForm />
-        </section>
+        </CreateSection>
       )}
       <section className="section-card">
         <h2>{t('list.allTitle')}</h2>

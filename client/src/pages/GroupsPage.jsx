@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import CreateSection from '../components/CreateSection.jsx';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/AuthContext.jsx';
@@ -292,6 +293,7 @@ function GroupRow({ group, groups, canManage, canAssign, onManage, expanded, onT
                 </button>
                 <button
                   type="button"
+                  className="danger"
                   onClick={() => {
                     if (
                       window.confirm(
@@ -350,15 +352,16 @@ function GroupsPage() {
       <p className="hint">{t('groups.hint')}</p>
 
       {canManage && (
-        <section className="section-card">
-          <h2>{t('groups.addTitle')}</h2>
+        <CreateSection title={t('groups.addTitle')}>
           <NewGroupForm groups={tree} />
-        </section>
+        </CreateSection>
       )}
 
       <section className="section-card">
-        <h2>{t('groups.listTitle')}</h2>
-        <input type="search" aria-label={t('workflows:tree.search', { label: t('groups.title') })} placeholder={t('workflows:tree.search', { label: t('groups.title') })} value={search} onChange={event => setSearch(event.target.value)} />
+        <div className="home-section-head">
+          <h2>{t('groups.listTitle')}</h2>
+          <input type="search" className="search" aria-label={t('workflows:tree.search', { label: t('groups.title') })} placeholder={t('workflows:tree.search', { label: t('groups.title') })} value={search} onChange={event => setSearch(event.target.value)} />
+        </div>
         {groupsQuery.isPending && (
           <p className="hint">{t('common:status.loading')}</p>
         )}

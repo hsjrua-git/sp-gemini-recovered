@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import CreateSection from '../components/CreateSection.jsx';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router';
 import { useTranslation } from 'react-i18next';
@@ -329,8 +330,7 @@ function CafePurchasesPage() {
         </div>
       </div>
 
-      <section className="section-card">
-        <h2>{t('form.title')}</h2>
+      <CreateSection title={t('form.title')}>
         {suppliersQuery.isError || productsQuery.isError ? (
           <p className="error" role="alert">
             {errorMessage(suppliersQuery.error ?? productsQuery.error)}
@@ -342,7 +342,7 @@ function CafePurchasesPage() {
             loading={suppliersQuery.isPending || productsQuery.isPending}
           />
         )}
-      </section>
+      </CreateSection>
 
       <section className="section-card">
         <h2>{t('list.title')}</h2>

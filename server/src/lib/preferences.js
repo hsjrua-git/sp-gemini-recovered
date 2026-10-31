@@ -10,6 +10,8 @@ export const PALETTES = [
   'meadow',
   'cobalt',
   'crimson',
+  'aurum',
+  'aurum-glass',
 ];
 export const PAGE_SIZES = [10, 25, 50, 100];
 export const SORTS = ['newest', 'oldest', 'name', 'code'];
@@ -23,6 +25,8 @@ export const DEFAULT_PREFERENCES = {
   theme: 'dark',
   palette: 'aurora',
   language: 'fa',
+  persianFont: 'vazirmatn',
+  customCursor: true,
   studentsPageSize: 25,
   studentsSort: 'newest',
   studentsShowCode: true,
@@ -49,6 +53,8 @@ const CHECKS = {
   theme: (value) => THEMES.includes(value),
   palette: (value) => PALETTES.includes(value),
   language: (value) => LANGUAGES.includes(value),
+  persianFont: (value) => ['vazirmatn', 'estedad', 'shabnam', 'sahel'].includes(value),
+  customCursor: (value) => typeof value === 'boolean',
   studentsPageSize: (value) => PAGE_SIZES.includes(value),
   studentsSort: (value) => SORTS.includes(value),
   studentsShowCode: (value) => typeof value === 'boolean',

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import CreateSection from '../components/CreateSection.jsx';
 import { Link } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -332,7 +333,7 @@ function SessionsPage() {
       </div>
 
       {canManage && (
-        <section className="section-card">
+        <CreateSection title={t('sessions.generate.button')}>
           <SessionGenerator />
           <div className="row">
             <button
@@ -362,7 +363,7 @@ function SessionsPage() {
                   })}
             </p>
           )}
-        </section>
+        </CreateSection>
       )}
 
       <section className="section-card">
@@ -501,7 +502,7 @@ function SessionsPage() {
                         : '—'}
                     </td>
                     <td>{session.note ?? '—'}</td>
-                      <td>
+                      <td className="actions">
                         <button
                           type="button"
                           className="quiet"
@@ -535,7 +536,7 @@ function SessionsPage() {
                         ) : (
                           <button
                             type="button"
-                            className="quiet"
+                            className="danger"
                             onClick={() =>
                               runAction(quickCancel, { session, canceled: true })
                             }
@@ -556,7 +557,7 @@ function SessionsPage() {
                         ) : (
                           <button
                             type="button"
-                            className="quiet"
+                            className="danger"
                             onClick={() => runAction(archive, session)}
                             disabled={busy}
                           >

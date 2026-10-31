@@ -1,3 +1,28 @@
+# Recovery completion — 2026-10-31
+
+## Fixed
+
+- Recovered selected snapshot-2 interface improvements on foundation `9167d99`:
+  operational Home Overview, bounded 2D/3D charts, transparent glass palettes,
+  locally bundled Persian font choices, and compact management forms.
+- Preserved hidden evaluation drafts, added repeatable invalid-input navigation,
+  repaired drawer focus and late-loading transitions, and fixed the narrow
+  Evaluate selector and English accounting-report tab overflows.
+- Added root build-before-start orchestration for the real Express application.
+
+## Verification and remaining
+
+501 unit/core/client/agent tests and 6 separate PostgreSQL permission tests
+passed; client lint/build and all 37 PGlite migrations/checks passed. Swept 31
+routes at 1280/768/390px in Persian/dark and 390px in English/light, with passing
+retests for the two responsive defects. Original files and all 37 foundation
+migrations were preserved. [Recovery record and screenshots](docs/recovery-preview-2026-10-31.md).
+
+Historical policy deferrals, full PostgreSQL concurrency certification for this
+recovery, and physical-device checks remain outside this verification scope.
+
+---
+
 # Release repair — 2026-10-30
 
 ## Fixed
