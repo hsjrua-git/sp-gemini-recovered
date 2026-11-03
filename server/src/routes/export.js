@@ -220,7 +220,7 @@ async function handleCube(req, res) {
         JOIN assignments a ON a.id = s.assignment_id
         JOIN student_group_members ms
           ON ms.group_id = a.group_id
-         AND ms.added_at::date <= s.session_date
+         AND ms.joined_on <= s.session_date
          AND (ms.left_on IS NULL OR ms.left_on >= s.session_date)
         WHERE e.archived_at IS NULL
           AND s.canceled_at IS NULL

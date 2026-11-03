@@ -9,6 +9,7 @@ import FilterEditor from '../components/FilterEditor.jsx';
 import ResultsTable from '../components/ResultsTable.jsx';
 import SavedViewsBar from '../components/SavedViewsBar.jsx';
 import ReportScopePicker from '../components/ReportScopePicker.jsx';
+import AcademicRecovery from '../components/AcademicRecovery.jsx';
 import TreePicker from '../components/TreePicker.jsx';
 import ExportButton from '../components/ExportButton.jsx';
 import { formatIsoDate } from '../lib/format.js';
@@ -64,6 +65,7 @@ export default function ResultsPage() {
   return <main className="wide results">
     <h1>{t('results.title')}</h1>
     <ReportScopePicker report={report} />
+    {can('scores.override') && <AcademicRecovery kind="periods" />}
     <SavedViewsBar views={views.data ?? []} activeId={activeView?.id ?? null}
       dirty={Boolean(activeView && !sameConfig(savedConfig, activeView.config))}
       busy={report.isPending || create.isPending || update.isPending || remove.isPending}

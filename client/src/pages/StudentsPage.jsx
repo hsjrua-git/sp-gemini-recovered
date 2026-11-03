@@ -9,6 +9,7 @@ import ExportLink from '../components/ExportLink.jsx';
 import GroupFilter from '../components/GroupFilter.jsx';
 import StudentForm from '../components/StudentForm.jsx';
 import CreateSection from '../components/CreateSection.jsx';
+import AcademicRecovery from '../components/AcademicRecovery.jsx';
 import StudentsTable from '../components/StudentsTable.jsx';
 import { studentsCsvRows } from '../lib/exports.js';
 import { toIsoDate } from '../lib/format.js';
@@ -103,6 +104,7 @@ function StudentsPage() {
           groupId={groupId || null}
         />
       </section>
+      {can('students.delete') && <AcademicRecovery kind="students" />}
     </main>
   );
 }

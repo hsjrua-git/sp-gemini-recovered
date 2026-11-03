@@ -121,7 +121,7 @@ export async function getGroupMembers(id) {
             s.full_name        AS "fullName",
             s.student_code     AS "studentCode",
             m.id                   AS "membershipId",
-            m.added_at::date::text AS "joinedOn",
+            m.joined_on::text AS "joinedOn",
             m.left_on::text        AS "leftOn"
      FROM student_group_members m
      JOIN students s ON s.id = m.student_id AND s.deleted_at IS NULL
@@ -154,6 +154,7 @@ export async function createGroup(input = {}) {
   const client = await db.connect();
   try {
     await client.query('BEGIN');
+    await client.query('SELECT lock_academic_write()');
     if (parentId !== null) {
       const parent = await loadGroup(client, parentId);
       if (!parent || parent.archivedAt) {
@@ -237,6 +238,7 @@ export async function updateGroup(id, changes = {}) {
   const client = await db.connect();
   try {
     await client.query('BEGIN');
+    await client.query('SELECT lock_academic_write()');
     const group = await loadGroup(client, id);
     if (!group) {
       await client.query('ROLLBACK');
@@ -328,6 +330,7 @@ export async function archiveGroup(id) {
   const client = await db.connect();
   try {
     await client.query('BEGIN');
+    await client.query('SELECT lock_academic_write()');
     const group = await loadGroup(client, id);
     if (!group) {
       await client.query('ROLLBACK');
@@ -379,6 +382,7 @@ export async function setGroupMembers(id, changes = {}) {
   const client = await db.connect();
   try {
     await client.query('BEGIN');
+    await client.query('SELECT lock_academic_write()');
     const group = await loadGroup(client, id);
     if (!group) {
       await client.query('ROLLBACK');
@@ -393,8 +397,8 @@ export async function setGroupMembers(id, changes = {}) {
     let removed = 0;
     if (add.length > 0) {
       const result = await client.query(
-        `INSERT INTO student_group_members (student_id, group_id)
-         SELECT s.id, $1
+        `INSERT INTO student_group_members (student_id, group_id, joined_on)
+         SELECT s.id, $1, current_date
          FROM students s
          WHERE s.id = ANY($2::uuid[]) AND s.deleted_at IS NULL
          ON CONFLICT DO NOTHING`,

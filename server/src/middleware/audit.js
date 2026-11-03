@@ -1,5 +1,6 @@
 import pool from '../db/pool.js';
 import { recordAudit } from '../lib/audit.js';
+import { auditContext } from '../lib/auditContext.js';
 import {
   classifyRequest,
   entityIdFromPath,
@@ -21,6 +22,9 @@ export function auditRequests(req, res, next) {
 
   res.on('finish', () => {
     const path = normalisePath(req.originalUrl);
+    // These changes already have atomic row snapshots, recorded by database
+    // triggers. Route-level bulk summaries remain alongside those snapshots.
+    if (/^\/api\/(students|groups|teachers|parameters|intervals|assignments|sessions|periods|evaluations|tasks|task-templates|alerts|field-definitions)(\/|$)/.test(path)) return;
     const kind = classifyRequest(req.method, path, res.statusCode);
     if (!kind) return;
 
@@ -59,5 +63,5 @@ export function auditRequests(req, res, next) {
     });
   });
 
-  next();
+  auditContext.run({ userId: req.user?.id, actor: req.user?.username }, next);
 }

@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import pool from '../db/pool.js';
 import { isUuid } from '../lib/ids.js';
-import { generateCode } from '../lib/studentCode.js';
 import { parseAssignmentBody } from '../validation/schedule.js';
 import { recordAudit } from '../lib/audit.js';
 
@@ -179,6 +178,7 @@ router.post('/bulk', async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    await client.query('SELECT lock_academic_write()');
     const ids = [];
     for (const item of parsed) {
       const a = item.value;
@@ -187,7 +187,7 @@ router.post('/bulk', async (req, res) => {
       const created = await client.query(
         `INSERT INTO assignments (code, name, teacher_id, interval_id, group_id, membership_id, anchor_date)
          VALUES ($1, $2, $3, $4, $5, $6, $7::date) RETURNING id`,
-        [generateCode(), a.name, a.teacherId, a.intervalId, a.groupId ?? null, a.membershipId ?? null, a.anchorDate]
+        [null, a.name, a.teacherId, a.intervalId, a.groupId ?? null, a.membershipId ?? null, a.anchorDate]
       );
       ids.push(created.rows[0].id);
     }
@@ -268,7 +268,7 @@ router.post('/', async (req, res) => {
          VALUES ($1, $2, $3, $4, $5, $6, $7::date, $8)
          RETURNING id`,
         [
-          assignment.code ?? generateCode(),
+          assignment.code,
           assignment.name,
           assignment.teacherId,
           assignment.intervalId,
@@ -286,7 +286,7 @@ router.post('/', async (req, res) => {
     } catch (err) {
       if (err.code !== UNIQUE_VIOLATION) throw err;
       if (err.constraint === 'assignments_code_unique' && assignment.code === null) {
-        continue; // astronomically unlikely; try a fresh generated code
+        continue; // Re-evaluate the database-generated suffix after a collision.
       }
       return res.status(409).json({
         error:

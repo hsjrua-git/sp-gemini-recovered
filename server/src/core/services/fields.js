@@ -92,6 +92,7 @@ export async function createField(input = {}) {
   const client = await db.connect();
   try {
     await client.query('BEGIN');
+    await client.query('SELECT lock_academic_write()');
     const orderResult = await client.query(
       `SELECT COALESCE(max(sort_order), 0) + 1 AS next FROM student_field_definitions`,
     );
@@ -148,6 +149,7 @@ export async function updateField(id, changes = {}) {
   const client = await db.connect();
   try {
     await client.query('BEGIN');
+    await client.query('SELECT lock_academic_write()');
     const existingResult = await client.query(
       `SELECT ${DEFINITION_COLUMNS} FROM student_field_definitions
        WHERE id = $1 FOR UPDATE`,
@@ -274,6 +276,7 @@ export async function archiveField(id) {
   const client = await db.connect();
   try {
     await client.query('BEGIN');
+    await client.query('SELECT lock_academic_write()');
     const updated = await client.query(
       `UPDATE student_field_definitions SET archived_at = now()
        WHERE id = $1 AND archived_at IS NULL

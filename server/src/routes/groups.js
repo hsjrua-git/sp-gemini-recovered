@@ -4,6 +4,7 @@ import { recordAudit } from '../lib/audit.js';
 import { descendantGroupIds } from '../lib/groups.js';
 import { isUuid } from '../lib/ids.js';
 import { generateCode } from '../lib/studentCode.js';
+import { isValidIsoDate, todayIso } from '../lib/periods.js';
 
 const router = Router();
 const UNIQUE_VIOLATION = '23505';
@@ -182,6 +183,7 @@ router.post('/', async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    await client.query('SELECT lock_academic_write()');
     if (parentId !== null) {
       const parent = await loadGroup(client, parentId);
       if (!parent || parent.archivedAt) {
@@ -288,6 +290,7 @@ router.patch('/:id', async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    await client.query('SELECT lock_academic_write()');
     const group = await loadGroup(client, req.params.id);
     if (!group) {
       await client.query('ROLLBACK');
@@ -383,6 +386,7 @@ router.delete('/:id', async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    await client.query('SELECT lock_academic_write()');
     const group = await loadGroup(client, req.params.id);
     if (!group) {
       await client.query('ROLLBACK');
@@ -436,8 +440,9 @@ router.get('/:id/members', async (req, res) => {
             s.full_name    AS "fullName",
             s.student_code AS "studentCode",
             m.id           AS "membershipId",
-            m.added_at::date   AS "joinedOn",
-            m.left_on          AS "leftOn"
+            m.joined_on::text  AS "joinedOn",
+            m.left_on::text    AS "leftOn",
+            m.created_at      AS "createdAt"
      FROM student_group_members m
      JOIN students s ON s.id = m.student_id AND s.deleted_at IS NULL
      WHERE m.group_id = $1
@@ -449,6 +454,11 @@ router.get('/:id/members', async (req, res) => {
 
 // PUT is mapped to the groups.assign permission in index.js.
 router.put('/:id/members', async (req, res) => {
+  const joinedOn = req.body?.joinedOn ?? todayIso();
+  const leftOn = req.body?.leftOn ?? todayIso();
+  if (!isValidIsoDate(joinedOn) || !isValidIsoDate(leftOn)) {
+    return res.status(400).json({ error: 'Use valid membership dates.', code: 'VALIDATION_INVALID_DATE' });
+  }
   const add = Array.isArray(req.body?.add) ? req.body.add : [];
   const remove = Array.isArray(req.body?.remove) ? req.body.remove : [];
   if (![...add, ...remove].every((id) => isUuid(id))) {
@@ -461,6 +471,7 @@ router.put('/:id/members', async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    await client.query('SELECT lock_academic_write()');
     const group = await loadGroup(client, req.params.id);
     if (!group) {
       await client.query('ROLLBACK');
@@ -480,12 +491,12 @@ router.put('/:id/members', async (req, res) => {
     let removed = 0;
     if (add.length > 0) {
       const result = await client.query(
-        `INSERT INTO student_group_members (student_id, group_id)
-         SELECT s.id, $1
+        `INSERT INTO student_group_members (student_id, group_id, joined_on)
+         SELECT s.id, $1, $3::date
          FROM students s
          WHERE s.id = ANY($2::uuid[]) AND s.deleted_at IS NULL
          ON CONFLICT DO NOTHING`,
-        [group.id, add]
+        [group.id, add, joinedOn]
       );
       added = result.rowCount;
     }
@@ -494,10 +505,10 @@ router.put('/:id/members', async (req, res) => {
       // history and only stops counting once left_on is set.
       const result = await client.query(
         `UPDATE student_group_members
-         SET left_on = current_date
+         SET left_on = $3::date
          WHERE group_id = $1 AND student_id = ANY($2::uuid[])
            AND left_on IS NULL`,
-        [group.id, remove]
+        [group.id, remove, leftOn]
       );
       removed = result.rowCount;
     }
@@ -519,6 +530,30 @@ router.put('/:id/members', async (req, res) => {
     throw err;
   } finally {
     client.release();
+  }
+});
+
+// PUT retains the groups.assign policy; changing dates is membership work.
+router.put('/:id/members/:membershipId', async (req, res) => {
+  const { joinedOn, leftOn = null } = req.body ?? {};
+  if (!isUuid(req.params.membershipId) || !isValidIsoDate(joinedOn) ||
+      (leftOn !== null && (!isValidIsoDate(leftOn) || leftOn < joinedOn))) {
+    return res.status(400).json({ error: 'Use valid membership dates in order.', code: 'VALIDATION_INVALID_DATE' });
+  }
+  try {
+    const result = await pool.query(
+      `UPDATE student_group_members SET joined_on=$3,left_on=$4
+       WHERE group_id=$1 AND id=$2
+       RETURNING id, joined_on::text AS "joinedOn",left_on::text AS "leftOn",created_at AS "createdAt"`,
+      [req.params.id, req.params.membershipId, joinedOn, leftOn],
+    );
+    if (!result.rowCount) return res.status(404).json({ error: 'Membership not found.', code: 'NOT_FOUND' });
+    res.json({ membership: result.rows[0] });
+  } catch (err) {
+    if (['23514','23505'].includes(err.code)) {
+      return res.status(409).json({ error: 'These dates conflict with retained history or another membership.', code: 'MEMBERSHIP_HISTORY_CONFLICT' });
+    }
+    throw err;
   }
 });
 

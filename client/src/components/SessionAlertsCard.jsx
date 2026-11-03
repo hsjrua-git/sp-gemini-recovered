@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router';
 import { useTranslation } from 'react-i18next';
-import { listAlerts, resolveAlert, scanAlerts } from '../api/alerts.js';
+import { deleteAlert, listAlerts, resolveAlert, scanAlerts } from '../api/alerts.js';
 import { useAuth } from '../auth/AuthContext.jsx';
 import { formatIsoDate } from '../lib/format.js';
 import { errorMessage } from '../i18n/errors.js';
@@ -33,9 +33,14 @@ function SessionAlertsCard() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['alerts'] }),
   });
 
+  const remove = useMutation({
+    mutationFn: deleteAlert,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['alerts'] }),
+  });
+
   if (alertsQuery.isPending || alertsQuery.isError) return null;
   const { alerts, truncated } = alertsQuery.data;
-  if (alerts.length === 0) return null;
+  if (alerts.length === 0 && !canManage) return null;
 
   const shown = alerts.slice(0, SHOWN);
 
@@ -62,6 +67,7 @@ function SessionAlertsCard() {
                 >
                   {t('sessions.alertsCard.resolve')}
                 </button>
+                <button type="button" className="quiet danger" onClick={() => remove.mutate(alert.id)} disabled={remove.isPending}>{t('common:actions.delete')}</button>
               </>
             )}
           </li>
@@ -102,9 +108,9 @@ function SessionAlertsCard() {
           )}
         </div>
       )}
-      {(resolve.isError || scan.isError) && (
+      {(resolve.isError || scan.isError || remove.isError) && (
         <p className="error" role="alert">
-          {errorMessage(resolve.error ?? scan.error)}
+          {errorMessage(resolve.error ?? scan.error ?? remove.error)}
         </p>
       )}
     </section>

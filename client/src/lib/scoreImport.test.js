@@ -86,7 +86,7 @@ describe('buildImport', () => {
     });
   }
 
-  it('turns valid rows into full-cell entries keyed by the membership', () => {
+  it('turns valid rows into partial entries without clearing omitted dimensions', () => {
     const built = run([['S1', 'Ada Lovelace', '8', '']]);
     expect(built.entries).toEqual([
       {
@@ -94,7 +94,6 @@ describe('buildImport', () => {
         parameterId: 'p1',
         selected: true,
         qualityValue: 8,
-        quantityValue: null,
       },
     ]);
     // Both dimension cells share the entry index.
@@ -136,7 +135,6 @@ describe('buildImport', () => {
         membershipId: 'm-a',
         parameterId: 'p1',
         selected: true,
-        qualityValue: null,
         quantityValue: 7,
       },
     ]);

@@ -18,11 +18,13 @@ REVOKE ALL ON SCHEMA public FROM public;
 SELECT format('GRANT USAGE ON SCHEMA public TO %I, %I', :'app_role', :'readonly_role')\gexec
 
 SELECT format(
-  'GRANT SELECT, INSERT, UPDATE, DELETE, TRUNCATE ON ALL TABLES IN SCHEMA public TO %I',
+  'GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO %I',
   :'app_role'
 )\gexec
 SELECT format('GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO %I', :'app_role')\gexec
 SELECT format('GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO %I', :'app_role')\gexec
+SELECT format('REVOKE ALL ON audit_log FROM %I', :'app_role')\gexec
+SELECT format('GRANT SELECT, INSERT ON audit_log TO %I', :'app_role')\gexec
 
 SELECT format('GRANT SELECT ON ALL TABLES IN SCHEMA public TO %I', :'readonly_role')\gexec
 SELECT format('REVOKE ALL ON users, user_sessions, secrets FROM %I', :'readonly_role')\gexec

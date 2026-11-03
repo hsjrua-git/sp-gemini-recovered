@@ -11,6 +11,7 @@ import {
   listGroups,
   updateGroup,
   updateGroupMembers,
+  updateMembershipDates,
 } from '../api/groups.js';
 import { listStudents } from '../api/students.js';
 import { formatIsoDate } from '../lib/format.js';
@@ -18,6 +19,33 @@ import { useDebouncedValue } from '../lib/useDebouncedValue.js';
 import { errorMessage } from '../i18n/errors.js';
 import HierarchySelect from '../components/HierarchySelect.jsx';
 import { branchIds, hierarchy } from '../lib/hierarchy.js';
+import JalaliDatePicker from '../components/JalaliDatePicker.jsx';
+
+function MembershipDates({ groupId, student }) {
+  const { t } = useTranslation(['workflows', 'common']);
+  const queryClient = useQueryClient();
+  const [editing, setEditing] = useState(false);
+  const [joinedOn, setJoinedOn] = useState(student.joinedOn);
+  const [leftOn, setLeftOn] = useState(student.leftOn ?? '');
+  const save = useMutation({
+    mutationFn: () => updateMembershipDates(groupId, student.membershipId, { joinedOn, leftOn: leftOn || null }),
+    onSuccess: () => {
+      setEditing(false);
+      for (const key of ['group-members', 'groups', 'student-groups', 'students', 'schedule-memberships',
+        'assignment-targets', 'task-targets', 'evaluations', 'results', 'export-cube', 'trends', 'dashboard', 'sessions']) {
+        queryClient.invalidateQueries({ queryKey: [key] });
+      }
+    },
+  });
+  if (!editing) return <button type="button" className="quiet" onClick={() => setEditing(true)}>{t('membership.editDates')}</button>;
+  return <form onSubmit={event => { event.preventDefault(); save.mutate(); }}>
+    <label>{t('membership.joinedOn')}<JalaliDatePicker value={joinedOn} onChange={setJoinedOn} required /></label>
+    <label>{t('membership.leftOn')}<JalaliDatePicker value={leftOn} onChange={setLeftOn} /></label>
+    <button disabled={save.isPending}>{t('common:actions.save')}</button>
+    <button type="button" onClick={() => setEditing(false)}>{t('common:actions.cancel')}</button>
+    {save.error && <p role="alert" className="error">{errorMessage(save.error)}</p>}
+  </form>;
+}
 
 function MemberPanel({ group, onClose }) {
   const { t } = useTranslation(['admin', 'common']);
@@ -73,6 +101,8 @@ function MemberPanel({ group, onClose }) {
               <li key={student.id}>
                 {student.fullName}{' '}
                 <code className="hint">{student.studentCode}</code>
+                <span className="hint">{formatIsoDate(student.joinedOn)}</span>
+                <MembershipDates groupId={group.id} student={student} />
                 <button
                   type="button"
                   className="quiet"
@@ -95,6 +125,7 @@ function MemberPanel({ group, onClose }) {
                       ({formatIsoDate(student.joinedOn)} →{' '}
                       {formatIsoDate(student.leftOn)})
                     </span>
+                    <MembershipDates groupId={group.id} student={student} />
                 <button
                   type="button"
                   className="quiet"

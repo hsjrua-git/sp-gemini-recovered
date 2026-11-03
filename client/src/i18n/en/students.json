@@ -87,7 +87,7 @@
     "blindHint": "Blind entry: previously saved values are hidden from you.",
     "unsavedConfirm": "You have unsaved changes. Discard them and switch?",
     "overridePrompt": "{{count}} of your changes are to locked cells. Enter the reason for changing them (5 to 300 characters). It is recorded in the audit log.",
-    "lockHint": "A cell can be changed for 7 days after its session date (1 day once the session is in the past). After that it is locked",
+    "lockHint": "Unanswered selections stay open. A first answer before the session’s 7-day deadline locks at that deadline; a later first answer gets 24 hours. Editing, clearing or restoring does not restart the window. After the deadline, the cell is locked",
     "lockHintOverride": ". You can still change it, with a written reason.",
     "lockHintNoOverride": " and only someone who can override locks can change it.",
     "fixCells": "Fix the red cells before saving.",
@@ -178,6 +178,7 @@
     "chooseAnotherFile": "Choose another file",
     "importAnotherFile": "Import another file",
     "students": {
+      "identityHint": "Map all identity columns. Birth dates must use YYYY-MM-DD (Gregorian); national IDs must contain all 10 digits. Empty or unmapped identity values cannot be imported.",
       "title": "Import students",
       "readOnlyDescription": "You do not have permission to import students.",
       "hint": "Choose a CSV file with one student per row. If your list is in Excel or LibreOffice, use \"Save as\" and pick CSV (UTF-8). Students get a random code when they are added.",

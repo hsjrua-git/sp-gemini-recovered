@@ -60,7 +60,7 @@ router.get('/targets', async (req, res) => {
      JOIN students st ON st.id = m.student_id
      WHERE s.id = ANY($1::uuid[]) AND s.archived_at IS NULL AND s.canceled_at IS NULL
        AND a.archived_at IS NULL AND st.deleted_at IS NULL
-       AND m.added_at::date <= s.session_date AND (m.left_on IS NULL OR m.left_on >= s.session_date)
+       AND m.joined_on <= s.session_date AND (m.left_on IS NULL OR m.left_on >= s.session_date)
      ORDER BY st.full_name LIMIT 5001`, [ids]);
   res.json({ targets: result.rows.slice(0, 5000), truncated: result.rowCount > 5000 });
 });
@@ -167,6 +167,7 @@ router.post('/from-template', async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    await client.query('SELECT lock_academic_write()');
     const template = await client.query(
       `SELECT id, title, description, parameter_id AS "parameterId",
               extra, checklist, sort_order AS "sortOrder"
@@ -228,6 +229,7 @@ async function updateProgress(req, res) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    await client.query('SELECT lock_academic_write()');
     const result = await client.query(`SELECT ${TASK_COLUMNS} FROM tasks WHERE id = $1 FOR UPDATE`, [req.params.id]);
     if (!result.rowCount) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Task not found.', code: 'NOT_FOUND' }); }
     const parsed = taskProgress(result.rows[0], req.body);

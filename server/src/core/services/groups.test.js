@@ -66,8 +66,8 @@ async function expectCode(code, fn) {
 // Insert a student directly (student_code must match ^[2-9A-HJ-NP-Z]{8}$).
 async function addStudent(pool, code, fullName) {
   const result = await pool.query(
-    `INSERT INTO students (student_code, full_name)
-     VALUES ($1, $2) RETURNING id`,
+    `INSERT INTO students (student_code, full_name,gender,birth_date,father_name,national_id)
+     VALUES ($1, $2,'female','2000-01-01','Test Father',lpad((SELECT count(*)+1 FROM students)::text,10,'0')) RETURNING id`,
     [code, fullName],
   );
   return result.rows[0].id;
@@ -216,7 +216,7 @@ test('group actions write audit rows attributed to the local actor', async () =>
 
     const audit = await pool.query(
       `SELECT action, actor FROM audit_log
-       WHERE entity_type = 'group' ORDER BY id`,
+       WHERE entity_type = 'group' AND details->>'source' IS DISTINCT FROM 'database' ORDER BY id`,
     );
     assert.deepEqual(
       audit.rows.map((r) => r.action),

@@ -162,7 +162,7 @@ test('own selected-empty and partial cells shadow the entire group cell within a
   }
 });
 
-test('fallback is resolved per session before the existing latest-non-null period merge', () => {
+test('fallback is resolved per session before independently averaging each dimension', () => {
   const { rows } = build({ evaluations: [
     evaluation({ sessionId: 'one', qualityValue: 9, quantityValue: 8 }),
     evaluation({ sessionId: 'one', membershipId: 'm1', qualityValue: 3 }),
@@ -171,7 +171,7 @@ test('fallback is resolved per session before the existing latest-non-null perio
     evaluation({ sessionId: 'three', quantityValue: 0 }),
     evaluation({ sessionId: 'three', membershipId: 'm2', qualityComment: 'absent' }),
   ] });
-  assert.deepEqual(rows[1].cells.speed, { quality: 7, quantity: 0, qualityComment: null, quantityComment: null, answered: true });
+  assert.deepEqual(rows[1].cells.speed, { quality: 5, quantity: 3, qualityComment: null, quantityComment: null, answered: true });
   assert.deepEqual(rows[2].cells.speed, { quality: 9, quantity: 8, qualityComment: 'absent', quantityComment: null, answered: true });
 });
 

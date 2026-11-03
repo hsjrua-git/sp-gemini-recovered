@@ -11,13 +11,17 @@
 // addedOn/leftOn bounds so group fallback respects historical membership.
 
 function mergeCell(existing, incoming) {
-  if (!existing) return incoming;
+  const qualityCount = (existing?.qualityCount ?? 0) + (incoming.quality != null ? 1 : 0);
+  const quantityCount = (existing?.quantityCount ?? 0) + (incoming.quantity != null ? 1 : 0);
+  const qualitySum = (existing?.qualitySum ?? 0) + (incoming.quality ?? 0);
+  const quantitySum = (existing?.quantitySum ?? 0) + (incoming.quantity ?? 0);
   return {
-    quality: incoming.quality ?? existing.quality,
-    quantity: incoming.quantity ?? existing.quantity,
-    qualityComment: incoming.qualityComment ?? existing.qualityComment,
-    quantityComment: incoming.quantityComment ?? existing.quantityComment,
-    answered: existing.answered || incoming.answered,
+    quality: qualityCount ? Math.round(qualitySum / qualityCount * 100) / 100 : null,
+    quantity: quantityCount ? Math.round(quantitySum / quantityCount * 100) / 100 : null,
+    qualitySum, quantitySum, qualityCount, quantityCount,
+    qualityComment: incoming.qualityComment ?? existing?.qualityComment ?? null,
+    quantityComment: incoming.quantityComment ?? existing?.quantityComment ?? null,
+    answered: Boolean(existing?.answered || incoming.answered),
   };
 }
 
@@ -102,7 +106,13 @@ function pickCells(membershipId, cellMap, parameters) {
   const cells = {};
   for (const parameter of parameters) {
     const cell = cellMap.get(`${membershipId ?? 'group'}:${parameter.id}`);
-    if (cell) cells[parameter.id] = cell;
+    if (cell) {
+      cells[parameter.id] = {
+        quality: cell.quality, quantity: cell.quantity,
+        qualityComment: cell.qualityComment, quantityComment: cell.quantityComment,
+        answered: cell.answered,
+      };
+    }
   }
   return cells;
 }

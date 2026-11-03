@@ -42,7 +42,7 @@ function checkDimensionComment(entry, field) {
 
 // Shape check only — no database. `selected` is the cell's existence: the row
 // is the expectation, so an entry always carries it explicitly.
-export function validateShape(entries) {
+export function validateShape(entries, { patch = false } = {}) {
   if (!Array.isArray(entries) || entries.length === 0) {
     return 'entries must be a non-empty list.';
   }
@@ -64,6 +64,7 @@ export function validateShape(entries) {
       return 'Every entry needs selected (true = keep the row, false = remove it).';
     }
     for (const field of ['qualityValue', 'quantityValue']) {
+      if (patch && !Object.hasOwn(entry, field)) continue;
       const error = checkDimensionValue(entry, field);
       if (error) return error;
     }

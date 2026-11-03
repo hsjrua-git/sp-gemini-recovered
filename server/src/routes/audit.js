@@ -100,6 +100,11 @@ router.get('/', async (req, res) => {
     }));
   }
 
+  if (!userCan(req, 'scores.view')) {
+    entries = entries.map(row => /^(scores|evaluation)\./.test(row.action)
+      ? { ...row, details: { redacted: true }, oldData: null, newData: null } : row);
+  }
+
   res.json({
     entries,
     total: countResult.rows[0].total,

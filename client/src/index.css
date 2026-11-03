@@ -4052,6 +4052,11 @@ html {
   border-color: color-mix(in srgb, var(--brand) 45%, var(--line-strong));
 }
 
+.drop-zone input[type='file'] {
+  min-inline-size: 0;
+  max-inline-size: 100%;
+}
+
 .drop-zone-mark {
   display: grid;
   place-items: center;

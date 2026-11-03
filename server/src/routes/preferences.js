@@ -7,12 +7,17 @@ import {
 
 const router = Router();
 
+async function withDefaults(stored) {
+  const result = await pool.query('SELECT settings FROM preferences WHERE id=1');
+  return mergePreferences(stored, result.rows[0]?.settings);
+}
+
 router.get('/', async (req, res) => {
   const result = await pool.query(
     'SELECT settings FROM user_preferences WHERE user_id = $1',
     [req.user.id]
   );
-  res.json({ preferences: mergePreferences(result.rows[0]?.settings) });
+  res.json({ preferences: await withDefaults(result.rows[0]?.settings) });
 });
 
 router.put('/', async (req, res) => {
@@ -43,14 +48,14 @@ router.put('/', async (req, res) => {
      RETURNING settings`,
     [req.user.id, JSON.stringify(parsed.values)]
   );
-  res.json({ preferences: mergePreferences(result.rows[0].settings) });
+  res.json({ preferences: await withDefaults(result.rows[0].settings) });
 });
 
 router.delete('/', async (req, res) => {
   await pool.query('DELETE FROM user_preferences WHERE user_id = $1', [
     req.user.id,
   ]);
-  res.json({ preferences: mergePreferences({}) });
+  res.json({ preferences: await withDefaults({}) });
 });
 
 export default router;

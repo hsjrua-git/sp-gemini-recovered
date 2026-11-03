@@ -1,5 +1,7 @@
 import { request } from './http.js';
 
+export function deleteAlert(id) { return request(`/api/alerts/${id}`, { method: 'DELETE' }); }
+
 export async function listAlerts({ status = 'open' } = {}) {
   const query = status !== 'open' ? `?status=${encodeURIComponent(status)}` : '';
   const data = await request(`/api/alerts${query}`);

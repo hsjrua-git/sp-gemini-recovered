@@ -49,7 +49,11 @@ function localDateFromIso(isoDate) {
       : String(isoDate ?? '').slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return null;
   const [year, month, day] = text.split('-').map(Number);
-  const date = new Date(year, month - 1, day);
+  if (year === 0) return null;
+  // The multi-argument Date constructor silently shifts years 0–99 to 1900–1999.
+  const date = new Date(0);
+  date.setHours(0, 0, 0, 0);
+  date.setFullYear(year, month - 1, day);
   if (
     date.getFullYear() !== year ||
     date.getMonth() !== month - 1 ||

@@ -1,5 +1,6 @@
 import connectPgSimple from 'connect-pg-simple';
 import express from 'express';
+import { startAlertScanner } from './lib/alerts.js';
 import session from 'express-session';
 import pool from './db/pool.js';
 import { attachUser, authorize, requireLogin, requirePermission } from './middleware/auth.js';
@@ -218,6 +219,7 @@ app.use(
     POST: 'students.create',
     PATCH: 'students.edit',
     DELETE: 'students.delete',
+    PUT: 'students.delete',
   }),
   studentsRouter
 );
@@ -228,7 +230,7 @@ app.use(
 app.use('/api', parametersRouter);
 // The period calendar carries no dedicated key — any signed-in user needs it
 // for the app to function. `true` means just login.
-app.use('/api/periods', authorize({ GET: true }));
+app.use('/api/periods', authorize({ GET: true, PUT: 'scores.override' }));
 app.use('/api', periodsRouter);
 app.use('/api/evaluations', authorize({ GET: 'scores.view', PUT: 'scores.enter' }));
 app.use('/api', evaluationsRouter);
@@ -336,6 +338,7 @@ app.use(
     GET: 'schedule.view',
     POST: 'schedule.manage',
     PATCH: 'schedule.manage',
+    DELETE: 'schedule.manage',
   }),
   alertsRouter
 );
@@ -479,6 +482,13 @@ if (serveClient) {
 
 app.use((err, req, res, next) => {
   if (res.headersSent) return next(err);
+  if (/^\/api\/(students|groups|teachers|parameters|assignments|sessions|periods|evaluations|tasks|task-templates|intervals)(\/|$)/.test(req.path)
+      && ['23514', '23505', '23503', '40001'].includes(err.code)) {
+    return res.status(409).json({
+      error: 'This change conflicts with required identity or retained academic history.',
+      code: err.code === '23505' ? 'VALIDATION_NOT_UNIQUE' : 'ACADEMIC_HISTORY_CONFLICT',
+    });
+  }
   const closedPeriod = /(?:post|void).*closed fiscal period/i.test(String(err?.message));
   const malformedJson = err?.type === 'entity.parse.failed';
   const tooLarge = err?.type === 'entity.too.large';
@@ -510,6 +520,9 @@ const port = process.env.PORT || 3000;
 // Set HOST=127.0.0.1 in .env to keep it to this computer only.
 const host = process.env.HOST || '0.0.0.0';
 const readiness = await databaseReady.check();
+const stopAlertScanner = readiness.ok ? startAlertScanner(pool) : async () => {};
+process.once('SIGTERM', async () => { await stopAlertScanner(); await pool.end(); process.exit(0); });
+process.once('SIGINT', async () => { await stopAlertScanner(); await pool.end(); process.exit(0); });
 if (!readiness.ok) console.error(`${readiness.code}: ${readiness.error}`);
 app.listen(port, host, () => {
   const shown = host === '0.0.0.0' ? 'this machine on your network' : host;

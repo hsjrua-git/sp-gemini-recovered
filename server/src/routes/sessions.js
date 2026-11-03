@@ -3,7 +3,6 @@ import pool from '../db/pool.js';
 import { recordAudit } from '../lib/audit.js';
 import { isUuid } from '../lib/ids.js';
 import { isValidIsoDate, todayIso } from '../lib/periods.js';
-import { locksAtFor } from '../lib/locks.js';
 import { parseSessionPlan, planSessions, applySessionPlan } from '../lib/sessionPlan.js';
 
 const router = Router();
@@ -134,6 +133,7 @@ router.post('/generate', async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    await client.query('SELECT lock_academic_write()');
     const plan = await planSessions(client, parsed.value);
     if (plan.error) { await client.query('ROLLBACK'); return res.status(400).json(plan); }
     if (req.body.dryRun === true) { await client.query('ROLLBACK'); return res.json(plan); }
@@ -231,6 +231,7 @@ router.patch('/:id', async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    await client.query('SELECT lock_academic_write()');
     const result = await client.query(
       `UPDATE sessions
        SET ${sets.join(', ')}
@@ -249,22 +250,7 @@ router.patch('/:id', async (req, res) => {
         params: { entity: 'session' },
       });
     }
-    const updated = result.rows[0];
-
-    // A move changes the effective date: the lock windows of still-unlocked
-    // rows re-anchor to the new date (locked ones keep their old window —
-    // changing them already needs an override).
-    if ('movedTo' in body && !updated.canceledAt && !updated.archivedAt) {
-      await client.query(
-        `UPDATE evaluations
-         SET locks_at = $1
-         WHERE session_id = $2 AND locks_at > now()`,
-        [
-          locksAtFor({ sessionDate: updated.sessionDate, today: todayIso() }),
-          req.params.id,
-        ]
-      );
-    }
+    // The database reanchors still-open deadlines using first_answered_at.
     await client.query('COMMIT');
   } catch (err) {
     await client.query('ROLLBACK');

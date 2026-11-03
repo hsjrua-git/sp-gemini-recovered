@@ -159,8 +159,8 @@ test('update choices refuses to drop a value a student is using', async () => {
 
     // Park a student on the 'Red' choice.
     await pool.query(
-      `INSERT INTO students (student_code, full_name, extra)
-       VALUES ('ABCDEFGH', 'Grace Hopper', $1::jsonb)`,
+      `INSERT INTO students (student_code, full_name, extra,gender,birth_date,father_name,national_id)
+       VALUES ('ABCDEFGH', 'Grace Hopper', $1::jsonb,'female','2000-01-01','Test Father','1000000001')`,
       [JSON.stringify({ [field.id]: 'Red' })],
     );
     await expectCode('CONFLICT', () => updateField(field.id, { choices: ['Blue'] }));

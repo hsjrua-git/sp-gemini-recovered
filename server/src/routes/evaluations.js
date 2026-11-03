@@ -5,10 +5,9 @@ import { isUuid } from '../lib/ids.js';
 import {
   cellKey,
   findLockedChanges,
-  locksAtFor,
   parseOverrideReason,
 } from '../lib/locks.js';
-import { todayIso } from '../lib/periods.js';
+import { effectiveEntry, writeEvaluationCell } from '../lib/evaluationCell.js';
 import { userCan } from '../middleware/auth.js';
 import {
   findProblems,
@@ -33,7 +32,7 @@ async function loadTargets(db, assignment) {
        JOIN students s ON s.id = ms.student_id
        JOIN student_groups g ON g.id = ms.group_id AND g.archived_at IS NULL
        WHERE ms.id = $1
-         AND ms.added_at::date <= $2::date
+         AND ms.joined_on <= $2::date
          AND (ms.left_on IS NULL OR ms.left_on >= $2::date)
          AND s.deleted_at IS NULL`,
       [assignment.assignmentMembershipId, assignment.sessionDate]
@@ -49,7 +48,7 @@ async function loadTargets(db, assignment) {
      JOIN students s ON s.id = ms.student_id
      JOIN student_groups g ON g.id = ms.group_id AND g.archived_at IS NULL
      WHERE ms.group_id = $1
-       AND ms.added_at::date <= $2::date
+       AND ms.joined_on <= $2::date
        AND (ms.left_on IS NULL OR ms.left_on >= $2::date)
        AND s.deleted_at IS NULL
      ORDER BY lower(s.full_name)`,
@@ -68,25 +67,31 @@ const EVALUATION_SELECT = `
          p.seq                           AS "periodSeq",
          e.parameter_id                  AS "parameterId",
          e.membership_id                 AS "membershipId",
-         ms.student_id::text             AS "studentId",
+          ms.student_id::text             AS "studentId",
+          st.full_name AS "studentName",
+          parameter.name AS "parameterName",
          e.quality_value                 AS "qualityValue",
          e.quantity_value                AS "quantityValue",
          e.quality_comment               AS "qualityComment",
          e.quantity_comment              AS "quantityComment",
          e.locks_at                      AS "locksAt",
-         (e.locks_at <= now())           AS "isLocked",
+          COALESCE(e.locks_at <= now(), false) AS "isLocked",
+          e.first_answered_at AS "firstAnsweredAt",
+          e.archived_at AS "archivedAt",
          e.updated_at                    AS "updatedAt"
   FROM evaluations e
   JOIN sessions s ON s.id = e.session_id
   LEFT JOIN periods p ON p.id = s.period_id AND p.archived_at IS NULL
-  LEFT JOIN student_group_members ms ON ms.id = e.membership_id
+   LEFT JOIN student_group_members ms ON ms.id = e.membership_id
+   LEFT JOIN students st ON st.id = ms.student_id
+   JOIN parameters parameter ON parameter.id = e.parameter_id
 `;
 
 // History and grid reads. Filters combine; at least one is required so the
 // endpoint can never become a full-table dump.
 router.get('/evaluations', async (req, res) => {
   const { sessionId, assignmentId, studentId, parameterId } = req.query;
-  const conditions = ['e.archived_at IS NULL'];
+  const conditions = [req.query.includeArchived === '1' ? 'true' : 'e.archived_at IS NULL'];
   const values = [];
 
   if (sessionId !== undefined) {
@@ -140,7 +145,7 @@ router.get('/evaluations', async (req, res) => {
                JOIN student_group_members m2 ON m2.group_id = a2.group_id
                WHERE a2.id = s.assignment_id
                  AND m2.student_id = $${values.length}
-                 AND m2.added_at::date <= s.session_date
+                 AND m2.joined_on <= s.session_date
                  AND (m2.left_on IS NULL OR m2.left_on >= s.session_date))))`
     );
   }
@@ -191,7 +196,7 @@ router.put('/evaluations/bulk', async (req, res) => {
       params: { field: 'sessionId' },
     });
   }
-  const shapeError = validateShape(entries);
+  const shapeError = validateShape(entries, { patch: source === 'import' });
   if (shapeError) {
     return res.status(400).json({
       error: shapeError,
@@ -279,9 +284,10 @@ router.put('/evaluations/bulk', async (req, res) => {
               quality_comment     AS "qualityComment",
               quantity_comment    AS "quantityComment",
               locks_at            AS "locksAt",
-              (locks_at <= now()) AS "isLocked"
+               COALESCE(locks_at <= now(), false) AS "isLocked",
+               archived_at AS "archivedAt"
        FROM evaluations
-       WHERE session_id = $1 AND archived_at IS NULL`,
+        WHERE session_id = $1`,
       [sessionId]
     );
     const existing = new Map(
@@ -299,6 +305,7 @@ router.put('/evaluations/bulk', async (req, res) => {
       existing,
       problemIndexes: new Set(problems.map((problem) => problem.index)),
       canViewScores,
+      patch: source === 'import',
     });
     return res.json({
       dryRun: true,
@@ -318,10 +325,6 @@ router.put('/evaluations/bulk', async (req, res) => {
     });
   }
 
-  const locksAt = locksAtFor({
-    sessionDate: session.sessionDate,
-    today: todayIso(),
-  });
   const changes = [];
   const snapshots = { old: [], new: [] };
   let overrideReason = null;
@@ -329,6 +332,7 @@ router.put('/evaluations/bulk', async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    await client.query('SELECT lock_academic_write()');
 
     const existingResult = await client.query(
       `SELECT id,
@@ -339,9 +343,10 @@ router.put('/evaluations/bulk', async (req, res) => {
               quality_comment     AS "qualityComment",
               quantity_comment    AS "quantityComment",
               locks_at            AS "locksAt",
-              (locks_at <= now()) AS "isLocked"
+               COALESCE(locks_at <= now(), false) AS "isLocked",
+               archived_at AS "archivedAt"
        FROM evaluations
-       WHERE session_id = $1 AND archived_at IS NULL
+        WHERE session_id = $1
        ORDER BY membership_id NULLS FIRST, parameter_id
        FOR UPDATE`,
       [sessionId]
@@ -354,7 +359,7 @@ router.put('/evaluations/bulk', async (req, res) => {
     );
 
     const lockedChanges = findLockedChanges({
-      entries, existing, canViewScores: userCan(req, 'scores.view'),
+      entries, existing, canViewScores: userCan(req, 'scores.view'), patch: source === 'import',
     });
     const overriddenKeys = new Set(
       lockedChanges.map((item) =>
@@ -401,16 +406,10 @@ router.put('/evaluations/bulk', async (req, res) => {
     for (const entry of entries) {
       const key = cellKey(entry.membershipId, entry.parameterId);
       const row = existing.get(key);
-      const to = {
-        selected: entry.selected,
-        qualityValue: entry.qualityValue ?? null,
-        quantityValue: entry.quantityValue ?? null,
-        qualityComment: entry.qualityComment ?? null,
-        quantityComment: entry.quantityComment ?? null,
-      };
+      const to = effectiveEntry(entry, row, source === 'import');
       const before = row
         ? {
-            selected: true,
+            selected: !row.archivedAt,
             qualityValue: row.qualityValue,
             quantityValue: row.quantityValue,
             qualityComment: row.qualityComment,
@@ -418,44 +417,7 @@ router.put('/evaluations/bulk', async (req, res) => {
           }
         : null;
 
-      let result;
-      if (!entry.selected) {
-        // Unselect: drop the row entirely (a stored row IS the expectation).
-        if (!row) continue;
-        result = await client.query(
-          'DELETE FROM evaluations WHERE id = $1',
-          [row.id]
-        );
-      } else {
-        result = await client.query(
-          `INSERT INTO evaluations
-             (session_id, parameter_id, membership_id,
-              quality_value, quantity_value, quality_comment, quantity_comment,
-              locks_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-           ON CONFLICT (session_id, parameter_id, membership_id) DO UPDATE
-             SET quality_value    = EXCLUDED.quality_value,
-                 quantity_value   = EXCLUDED.quantity_value,
-                 quality_comment  = EXCLUDED.quality_comment,
-                 quantity_comment = EXCLUDED.quantity_comment,
-                 locks_at         = EXCLUDED.locks_at,
-                 updated_at       = now()
-           WHERE evaluations.quality_value    IS DISTINCT FROM EXCLUDED.quality_value
-              OR evaluations.quantity_value   IS DISTINCT FROM EXCLUDED.quantity_value
-              OR evaluations.quality_comment  IS DISTINCT FROM EXCLUDED.quality_comment
-              OR evaluations.quantity_comment IS DISTINCT FROM EXCLUDED.quantity_comment`,
-          [
-            sessionId,
-            entry.parameterId,
-            entry.membershipId,
-            to.qualityValue,
-            to.quantityValue,
-            to.qualityComment,
-            to.quantityComment,
-            locksAt,
-          ]
-        );
-      }
+      const result = await writeEvaluationCell(client, sessionId, to, row);
 
       if (result.rowCount > 0) {
         const target = entry.membershipId
@@ -476,7 +438,7 @@ router.put('/evaluations/bulk', async (req, res) => {
           before ? { key, ...before } : { key, existed: false }
         );
         snapshots.new.push(
-          entry.selected ? { key, ...to } : { key, deleted: true }
+          entry.selected ? { key, ...to } : { key, archived: true }
         );
       }
     }
@@ -518,6 +480,40 @@ router.put('/evaluations/bulk', async (req, res) => {
   }
 
   res.json({ sessionId, changed: changes.length });
+});
+
+router.put('/evaluations/:id/archive', async (req, res) => {
+  if (!isUuid(req.params.id) || typeof req.body?.archived !== 'boolean') {
+    return res.status(400).json({ error: 'Choose a cell and archived state.', code: 'VALIDATION_INVALID_TYPE' });
+  }
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('SELECT lock_academic_write()');
+    const result = await client.query('SELECT id,locks_at<=now() AS locked FROM evaluations WHERE id=$1 FOR UPDATE', [req.params.id]);
+    if (!result.rowCount) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Evaluation not found.', code: 'NOT_FOUND' });
+    }
+    if (result.rows[0].locked) {
+      if (!userCan(req, 'scores.override')) {
+        await client.query('ROLLBACK');
+        return res.status(409).json({ error: 'This score is locked.', code: 'LOCKED' });
+      }
+      const reason = parseOverrideReason(req.body.overrideReason);
+      if (reason.error) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: reason.error, code: 'OVERRIDE_REASON_REQUIRED' });
+      }
+      await client.query("SELECT set_config('app.override_reason',$1,true)", [reason.value]);
+    }
+    await client.query('UPDATE evaluations SET archived_at=CASE WHEN $2 THEN COALESCE(archived_at,now()) ELSE NULL END WHERE id=$1', [req.params.id, req.body.archived]);
+    await client.query('COMMIT');
+    res.json({ id: req.params.id, archived: req.body.archived });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally { client.release(); }
 });
 
 export default router;

@@ -144,19 +144,20 @@ export function parsePreferencesUpdate(body) {
   return { values };
 }
 
-export function mergePreferences(stored) {
+export function mergePreferences(stored, defaults = {}) {
   const result = {
     ...DEFAULT_PREFERENCES,
     hiddenParameterIds: [],
     dashboardConstellation: { ...DEFAULT_PREFERENCES.dashboardConstellation },
   };
-  if (stored !== null && typeof stored === 'object') {
+  for (const source of [defaults, stored]) {
+    if (source === null || typeof source !== 'object') continue;
     for (const key of Object.keys(CHECKS)) {
-      if (Object.hasOwn(stored, key) && CHECKS[key](stored[key])) {
+      if (Object.hasOwn(source, key) && CHECKS[key](source[key])) {
         result[key] =
           key === 'dashboardConstellation'
-            ? { ...DEFAULT_PREFERENCES.dashboardConstellation, ...stored[key] }
-            : stored[key];
+            ? { ...result.dashboardConstellation, ...source[key] }
+            : source[key];
       }
     }
   }

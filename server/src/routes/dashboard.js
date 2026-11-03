@@ -46,7 +46,7 @@ router.get('/trends', async (req, res) => {
   }
 
   const result = await pool.query(
-    `SELECT e.parameter_id  AS "parameterId",
+    `WITH per_member AS (SELECT e.parameter_id AS "parameterId",
             s.assignment_id AS "assignmentId",
             a.name          AS "assignmentName",
             p.seq           AS "periodSeq",
@@ -55,12 +55,14 @@ router.get('/trends', async (req, res) => {
             max(s.session_date)::text AS "lastSessionDate"
      FROM evaluations e
      JOIN sessions s ON s.id = e.session_id
+     JOIN parameters parameter ON parameter.id=e.parameter_id AND parameter.archived_at IS NULL
      JOIN periods p ON p.id = s.period_id AND p.archived_at IS NULL
       JOIN assignments a ON a.id = s.assignment_id
       JOIN student_group_members ms
         ON (ms.group_id = a.group_id OR ms.id = a.membership_id)
-       AND ms.added_at::date <= s.session_date
+       AND ms.joined_on <= s.session_date
        AND (ms.left_on IS NULL OR ms.left_on >= s.session_date)
+      JOIN students st ON st.id=ms.student_id AND st.deleted_at IS NULL
       WHERE e.archived_at IS NULL
         AND (e.membership_id = ms.id OR (
           e.membership_id IS NULL AND a.group_id IS NOT NULL
@@ -74,8 +76,12 @@ router.get('/trends', async (req, res) => {
        AND s.archived_at IS NULL
        AND ${valueColumn} IS NOT NULL
        ${groupFilter}
-     GROUP BY e.parameter_id, s.assignment_id, a.name, p.seq
-     ORDER BY s.assignment_id, e.parameter_id, p.seq`,
+      GROUP BY e.parameter_id, s.assignment_id, a.name, p.seq, ms.id)
+      SELECT "parameterId", "assignmentId", "assignmentName", "periodSeq",
+             round(avg(average)::numeric,2)::float8 AS average, sum(count)::int AS count,
+             max("lastSessionDate") AS "lastSessionDate"
+      FROM per_member GROUP BY "parameterId", "assignmentId", "assignmentName", "periodSeq"
+      ORDER BY "assignmentId", "parameterId", "periodSeq"`,
     values
   );
   res.json({ trends: result.rows });
@@ -104,7 +110,9 @@ router.get('/summary', async (req, res) => {
   }
 
   const scopeValues = [];
-  const scopeConditions = ['s.canceled_at IS NULL', 's.archived_at IS NULL'];
+  const scopeConditions = ['s.canceled_at IS NULL', 's.archived_at IS NULL',
+    'EXISTS (SELECT 1 FROM parameters p WHERE p.id=e.parameter_id AND p.archived_at IS NULL)',
+    '(s.period_id IS NULL OR EXISTS (SELECT 1 FROM periods p WHERE p.id=s.period_id AND p.archived_at IS NULL))'];
   if (assignmentId !== undefined) {
     scopeValues.push(assignmentId);
     scopeConditions.push(`s.assignment_id = $${scopeValues.length}`);
@@ -138,7 +146,7 @@ router.get('/summary', async (req, res) => {
        JOIN assignments a ON a.id = s.assignment_id
        JOIN student_group_members ms
           ON ms.group_id = a.group_id
-         AND ms.added_at::date <= s.session_date
+         AND ms.joined_on <= s.session_date
          AND (ms.left_on IS NULL OR ms.left_on >= s.session_date)
        WHERE e.membership_id IS NULL AND e.archived_at IS NULL
          AND ${scopeConditions.join(' AND ')}
@@ -169,8 +177,7 @@ router.get('/summary', async (req, res) => {
        UNION ALL
        SELECT id, session_id, parameter_id, answered, "membershipId" FROM member_cells
      ) cells
-      JOIN student_group_members ms ON ms.id = cells."membershipId"
-        AND ms.left_on IS NULL`,
+       JOIN student_group_members ms ON ms.id = cells."membershipId"`,
     scopeValues
   );
 
@@ -187,7 +194,7 @@ router.get('/summary', async (req, res) => {
   }
 
   const roster = await pool.query(
-    `SELECT s.id, s.full_name AS "fullName", s.student_code AS "studentCode"
+    `SELECT DISTINCT s.id, s.full_name AS "fullName", s.student_code AS "studentCode", lower(s.full_name) AS "sortName"
      FROM students s
      ${rosterJoin}
      WHERE ${rosterWhere}

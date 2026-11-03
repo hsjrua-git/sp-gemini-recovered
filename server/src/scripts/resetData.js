@@ -67,6 +67,12 @@ export async function reset(db) {
   const client = await db.connect();
   try {
     await client.query('BEGIN');
+    // Take the academic gate before TRUNCATE's table locks, matching the
+    // background scanner and every transactional academic writer.
+    if ((await client.query("SELECT to_regprocedure('lock_academic_write()') AS gate")).rows[0].gate) {
+      await client.query('SELECT lock_academic_write()');
+    }
+    await client.query("SELECT set_config('app.reset_data', 'on', true)");
 
     // Content + structure + cafe + accounting runtime ledgers. Truncating cafe
     // purchases/movements/sales/balances and accounting journals/periods before
@@ -124,6 +130,10 @@ export async function reset(db) {
     await client.query('TRUNCATE audit_log RESTART IDENTITY');
     await client.query('DELETE FROM saved_views');
     await client.query('DELETE FROM user_preferences');
+    if ((await client.query("SELECT to_regclass('public.preferences') AS table_name")).rows[0].table_name) {
+      await client.query("UPDATE preferences SET settings = '{}'::jsonb WHERE id = 1");
+      await client.query('DELETE FROM settings');
+    }
 
     // Every account except real Administrator(s). The known-password sample
     // fixtures must never survive a reset into an otherwise production-like DB.

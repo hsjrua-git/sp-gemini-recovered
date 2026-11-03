@@ -1,4 +1,6 @@
 {
+  "MEMBERSHIP_HISTORY_CONFLICT": "These dates conflict with retained evaluations, tasks or another membership.",
+  "ACADEMIC_HISTORY_CONFLICT": "This change conflicts with required identity or retained academic history. Check the dates and references.",
   "DATABASE_MIGRATIONS_PENDING": "The database needs an upgrade. Ask the administrator to run npm run migrate from server/, then retry.",
   "DATABASE_UNAVAILABLE": "The database is unavailable. Ask the administrator to check the database service and server configuration.",
   "TASK_CHECKLIST_INVALID": "Use up to 50 checklist items (1–200 characters each) and notes up to 2,000 characters. Update progress separately from task definitions.",

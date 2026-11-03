@@ -19,26 +19,27 @@ test('current and future sessions get 7 days, older ones 1', () => {
   assert.equal(LATE_LOCK_DAYS, 1);
   assert.equal(lockDaysFor({ sessionDate: '2026-03-10', today: '2026-03-10' }), 7);
   assert.equal(lockDaysFor({ sessionDate: '2026-03-10', today: '2026-03-16' }), 7);
-  // Exactly seven days after the session is still inside the window…
-  assert.equal(lockDaysFor({ sessionDate: '2026-03-10', today: '2026-03-17' }), 7);
+  // The weekly deadline itself begins the late-answer window.
+  assert.equal(lockDaysFor({ sessionDate: '2026-03-10', today: '2026-03-17' }), 1);
   // …the day after, it is late.
   assert.equal(lockDaysFor({ sessionDate: '2026-03-10', today: '2026-03-18' }), 1);
   assert.equal(lockDaysFor({ sessionDate: '2026-03-10', today: '2026-04-10' }), 1);
   assert.equal(lockDaysFor({ sessionDate: '2026-06-01', today: '2026-03-10' }), 7);
 });
 
-test('locks_at is the session date plus its window, at midnight UTC', () => {
+test('UTC deadline mirror leaves unanswered cells open and gives late answers 24 hours', () => {
+  assert.equal(locksAtFor({ sessionDate: '2026-03-10' }), null);
   assert.equal(
-    locksAtFor({ sessionDate: '2026-03-10', today: '2026-03-12' }),
+    locksAtFor({ sessionDate: '2026-03-10', firstAnsweredAt: '2026-03-12T14:30:00Z' }),
     '2026-03-17T00:00:00.000Z'
   );
   assert.equal(
-    locksAtFor({ sessionDate: '2026-03-01', today: '2026-04-01' }),
-    '2026-03-02T00:00:00.000Z'
+    locksAtFor({ sessionDate: '2026-03-01', firstAnsweredAt: '2026-04-01T14:30:00Z' }),
+    '2026-04-02T14:30:00.000Z'
   );
   // Pure day arithmetic — a daylight-saving change in between shifts nothing.
   assert.equal(
-    locksAtFor({ sessionDate: '2026-10-24', today: '2026-10-24' }),
+    locksAtFor({ sessionDate: '2026-10-24', firstAnsweredAt: '2026-10-24T00:00:00Z' }),
     '2026-10-31T00:00:00.000Z'
   );
 });

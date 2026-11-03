@@ -30,10 +30,9 @@ import { isUuid } from '../../lib/ids.js';
 import {
   cellKey,
   findLockedChanges,
-  locksAtFor,
   parseOverrideReason,
 } from '../../lib/locks.js';
-import { todayIso } from '../../lib/periods.js';
+import { effectiveEntry, writeEvaluationCell } from '../../lib/evaluationCell.js';
 import {
   findProblems,
   normalizeComment,
@@ -57,7 +56,9 @@ const EVALUATION_SELECT = `
          e.quality_comment               AS "qualityComment",
          e.quantity_comment              AS "quantityComment",
          e.locks_at                      AS "locksAt",
-         (e.locks_at <= now())           AS "isLocked",
+          COALESCE(e.locks_at <= now(), false) AS "isLocked",
+          e.first_answered_at AS "firstAnsweredAt",
+          e.archived_at AS "archivedAt",
          e.updated_at                    AS "updatedAt"
   FROM evaluations e
   JOIN sessions s ON s.id = e.session_id
@@ -79,7 +80,7 @@ async function loadTargets(db, assignment) {
        JOIN students s ON s.id = ms.student_id
        JOIN student_groups g ON g.id = ms.group_id AND g.archived_at IS NULL
        WHERE ms.id = $1
-         AND ms.added_at::date <= $2::date
+         AND ms.joined_on <= $2::date
          AND (ms.left_on IS NULL OR ms.left_on >= $2::date)
          AND s.deleted_at IS NULL`,
       [assignment.assignmentMembershipId, assignment.sessionDate]
@@ -95,7 +96,7 @@ async function loadTargets(db, assignment) {
      JOIN students s ON s.id = ms.student_id
      JOIN student_groups g ON g.id = ms.group_id AND g.archived_at IS NULL
      WHERE ms.group_id = $1
-       AND ms.added_at::date <= $2::date
+       AND ms.joined_on <= $2::date
        AND (ms.left_on IS NULL OR ms.left_on >= $2::date)
        AND s.deleted_at IS NULL
      ORDER BY lower(s.full_name)`,
@@ -148,7 +149,7 @@ export async function getEvaluations(filters = {}) {
                JOIN student_group_members m2 ON m2.group_id = a2.group_id
                WHERE a2.id = s.assignment_id
                  AND m2.student_id = $${values.length}
-                 AND m2.added_at::date <= s.session_date
+                 AND m2.joined_on <= s.session_date
                  AND (m2.left_on IS NULL OR m2.left_on >= s.session_date))))`
     );
   }
@@ -193,7 +194,7 @@ export async function saveEvaluationsBulk(input = {}) {
   if (!isUuid(sessionId)) {
     throw ServiceError.validation('sessionId must be a valid ID.');
   }
-  const shapeError = validateShape(entries);
+  const shapeError = validateShape(entries, { patch: source === 'import' });
   if (shapeError) {
     throw ServiceError.validation(shapeError, { code: 'EVALUATIONS_INVALID_SHAPE' });
   }
@@ -276,9 +277,10 @@ export async function saveEvaluationsBulk(input = {}) {
               quality_comment     AS "qualityComment",
               quantity_comment    AS "quantityComment",
               locks_at            AS "locksAt",
-              (locks_at <= now()) AS "isLocked"
+               COALESCE(locks_at <= now(), false) AS "isLocked",
+               archived_at AS "archivedAt"
        FROM evaluations
-       WHERE session_id = $1 AND archived_at IS NULL`,
+        WHERE session_id = $1`,
       [sessionId]
     );
     const existing = new Map(
@@ -292,6 +294,7 @@ export async function saveEvaluationsBulk(input = {}) {
       existing,
       problemIndexes: new Set(problems.map((problem) => problem.index)),
       canViewScores: true,
+      patch: source === 'import',
     });
     return {
       dryRun: true,
@@ -324,7 +327,7 @@ export async function saveEvaluationsBulk(input = {}) {
 // false. Locks the session's rows FOR UPDATE, resolves the override reason for
 // any locked change (the single admin may always override, but a locked change
 // still demands a written reason — audited), then applies each entry as a
-// delete (unselect) or an upsert and records one audit row for the batch with
+// archive (unselect) or an upsert and records one audit row for the batch with
 // old_data/new_data cell snapshots.
 async function saveBulk({
   db,
@@ -336,7 +339,6 @@ async function saveBulk({
   source,
 }) {
   const { sessionId } = session;
-  const locksAt = locksAtFor({ sessionDate: session.sessionDate, today: todayIso() });
   const changes = [];
   const snapshots = { old: [], new: [] };
   let overrideReason = null;
@@ -344,6 +346,7 @@ async function saveBulk({
   const client = await db.connect();
   try {
     await client.query('BEGIN');
+    await client.query('SELECT lock_academic_write()');
 
     const existingResult = await client.query(
       `SELECT id,
@@ -354,9 +357,10 @@ async function saveBulk({
               quality_comment     AS "qualityComment",
               quantity_comment    AS "quantityComment",
               locks_at            AS "locksAt",
-              (locks_at <= now()) AS "isLocked"
+               COALESCE(locks_at <= now(), false) AS "isLocked",
+               archived_at AS "archivedAt"
        FROM evaluations
-       WHERE session_id = $1 AND archived_at IS NULL
+        WHERE session_id = $1
        ORDER BY membership_id NULLS FIRST, parameter_id
        FOR UPDATE`,
       [sessionId]
@@ -368,7 +372,7 @@ async function saveBulk({
       ])
     );
 
-    const lockedChanges = findLockedChanges({ entries, existing });
+    const lockedChanges = findLockedChanges({ entries, existing, patch: source === 'import' });
     const overriddenKeys = new Set(
       lockedChanges.map((item) => cellKey(item.membershipId, item.parameterId))
     );
@@ -401,16 +405,10 @@ async function saveBulk({
     for (const entry of entries) {
       const key = cellKey(entry.membershipId, entry.parameterId);
       const row = existing.get(key);
-      const to = {
-        selected: entry.selected,
-        qualityValue: entry.qualityValue ?? null,
-        quantityValue: entry.quantityValue ?? null,
-        qualityComment: entry.qualityComment ?? null,
-        quantityComment: entry.quantityComment ?? null,
-      };
+      const to = effectiveEntry(entry, row, source === 'import');
       const before = row
         ? {
-            selected: true,
+            selected: !row.archivedAt,
             qualityValue: row.qualityValue,
             quantityValue: row.quantityValue,
             qualityComment: row.qualityComment,
@@ -418,43 +416,7 @@ async function saveBulk({
           }
         : null;
 
-      let result;
-      if (!entry.selected) {
-        // Unselect: drop the row entirely (a stored row IS the expectation).
-        if (!row) continue;
-        result = await client.query('DELETE FROM evaluations WHERE id = $1', [
-          row.id,
-        ]);
-      } else {
-        result = await client.query(
-          `INSERT INTO evaluations
-             (session_id, parameter_id, membership_id,
-              quality_value, quantity_value, quality_comment, quantity_comment,
-              locks_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-           ON CONFLICT (session_id, parameter_id, membership_id) DO UPDATE
-             SET quality_value    = EXCLUDED.quality_value,
-                 quantity_value   = EXCLUDED.quantity_value,
-                 quality_comment  = EXCLUDED.quality_comment,
-                 quantity_comment = EXCLUDED.quantity_comment,
-                 locks_at         = EXCLUDED.locks_at,
-                 updated_at       = now()
-           WHERE evaluations.quality_value    IS DISTINCT FROM EXCLUDED.quality_value
-              OR evaluations.quantity_value   IS DISTINCT FROM EXCLUDED.quantity_value
-              OR evaluations.quality_comment  IS DISTINCT FROM EXCLUDED.quality_comment
-              OR evaluations.quantity_comment IS DISTINCT FROM EXCLUDED.quantity_comment`,
-          [
-            sessionId,
-            entry.parameterId,
-            entry.membershipId,
-            to.qualityValue,
-            to.quantityValue,
-            to.qualityComment,
-            to.quantityComment,
-            locksAt,
-          ]
-        );
-      }
+      const result = await writeEvaluationCell(client, sessionId, to, row);
 
       if (result.rowCount > 0) {
         const target = entry.membershipId ? targets.get(entry.membershipId) : null;
@@ -473,7 +435,7 @@ async function saveBulk({
           before ? { key, ...before } : { key, existed: false }
         );
         snapshots.new.push(
-          entry.selected ? { key, ...to } : { key, deleted: true }
+          entry.selected ? { key, ...to } : { key, archived: true }
         );
       }
     }

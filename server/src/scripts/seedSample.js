@@ -1,5 +1,4 @@
 import pool from '../db/pool.js';
-import { locksAtFor } from '../lib/locks.js';
 import { todayIso } from '../lib/periods.js';
 import { generateSessions } from '../lib/sessions.js';
 import { generateStudentCode, generateTeacherCode } from '../lib/studentCode.js';
@@ -167,6 +166,7 @@ async function removeSample() {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    await client.query('SELECT lock_academic_write()');
     // Sample history may already be past its lock deadline. The database lock
     // guard applies to DELETE as well as edits, so fixture teardown supplies a
     // transaction-local, explicit maintenance reason.
@@ -280,7 +280,7 @@ async function removeSample() {
         `  assignments: ${assignmentsDeleted}\n` +
         `  teachers:    ${teachers.rowCount} (only those no remaining assignment uses)\n` +
         `  parameters:  ${parameters.rowCount} (only those nothing remaining references)\n` +
-        `  sample users: ${connected.users}\n` +
+        `  sample users deactivated: ${connected.users}\n` +
         `  memberships: ${memberships.rowCount}\n` +
         `  students:    ${students.rowCount}\n` +
         `  groups:      ${groups.rows[0].count}`
@@ -327,7 +327,7 @@ async function addSample() {
 
     // Predictable role accounts let every permission-specific page be tested.
     // They are development fixtures only (the production guard above refuses
-    // them by default), and removeSample deletes them with their activity.
+    // them by default), and removeSample deactivates their retained audit actors.
     const users = await seedSampleUsers(client);
 
     // 1. Parameters (integer ranges, no unit — the schema-4 shape).
@@ -354,11 +354,11 @@ async function addSample() {
       let id = null;
       while (id === null) {
         const inserted = await client.query(
-          `INSERT INTO students (student_code, full_name)
-           VALUES ($1, $2)
+          `INSERT INTO students (student_code, full_name,gender,birth_date,father_name,national_id)
+           VALUES ($1, $2,'female','2000-01-01','Sample Father',$3)
            ON CONFLICT (student_code) DO NOTHING
            RETURNING id`,
-          [generateStudentCode(), name]
+          [generateStudentCode(), name, String(9000000000 + i)]
         );
         id = inserted.rows[0]?.id ?? null;
       }
@@ -382,7 +382,7 @@ async function addSample() {
       const groupIndex = i < studentIds.length / 2 ? 0 : 1;
       const ability = 0.3 + 0.6 * (((i * 37) % 17) / 16);
       const inserted = await client.query(
-        `INSERT INTO student_group_members (student_id, group_id, added_at)
+        `INSERT INTO student_group_members (student_id, group_id, joined_on)
          VALUES ($1, $2, current_date - 365)
          RETURNING id`,
         [studentIds[i], groupIds[groupIndex]]
@@ -393,7 +393,7 @@ async function addSample() {
     // serialization without changing either group's active roster.
     await client.query(
       `INSERT INTO student_group_members
-         (student_id, group_id, added_at, left_on)
+         (student_id, group_id, joined_on, left_on)
        VALUES ($1, $2, now() - interval '180 days', current_date - 120)`,
       [studentIds[0], groupIds[1]]
     );
@@ -515,7 +515,6 @@ async function addSample() {
       quantity: [],
       qualityComments: [],
       quantityComments: [],
-      locksAt: [],
     };
     let answered = 0;
     const seenKeys = new Set();
@@ -524,7 +523,6 @@ async function addSample() {
       const total = sessionsResult.rows.length;
       // Oldest session ≈ always answered, newest past session ≈ 55%.
       const ramp = total <= 1 ? 0.75 : 1 - 0.45 * (sessionIndex / (total - 1));
-      const locksAt = locksAtFor({ sessionDate: session.sessionDate, today });
       const roster = rosterByAssignment.get(session.assignmentId) ?? [];
 
       const assignment = assignmentById.get(session.assignmentId);
@@ -588,7 +586,6 @@ async function addSample() {
           cells.quantity.push(quantityValue);
           cells.qualityComments.push(qualityComment);
           cells.quantityComments.push(quantityComment);
-          cells.locksAt.push(locksAt);
         }
       }
     }
@@ -597,12 +594,11 @@ async function addSample() {
       await client.query(
         `INSERT INTO evaluations
            (session_id, parameter_id, membership_id,
-            quality_value, quantity_value, quality_comment, quantity_comment,
-            locks_at)
-         SELECT s, p, m, q, n, qc, nc, l
+             quality_value, quantity_value, quality_comment, quantity_comment)
+          SELECT s, p, m, q, n, qc, nc
          FROM unnest($1::uuid[], $2::uuid[], $3::uuid[], $4::int[], $5::int[],
-                     $6::text[], $7::text[], $8::timestamptz[])
-              AS t(s, p, m, q, n, qc, nc, l)`,
+                      $6::text[], $7::text[])
+               AS t(s, p, m, q, n, qc, nc)`,
         [
           cells.sessions,
           cells.parameters,
@@ -611,7 +607,6 @@ async function addSample() {
           cells.quantity,
           cells.qualityComments,
           cells.quantityComments,
-          cells.locksAt,
         ]
       );
     }

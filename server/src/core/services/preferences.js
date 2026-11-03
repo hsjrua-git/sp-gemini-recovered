@@ -16,6 +16,11 @@ import {
   parsePreferencesUpdate,
 } from '../../lib/preferences.js';
 
+async function withDefaults(db, stored) {
+  const result = await db.query('SELECT settings FROM preferences WHERE id=1');
+  return mergePreferences(stored, result.rows[0]?.settings);
+}
+
 // Read the stored preferences, filled in with defaults.
 export async function getPreferences() {
   const db = getDb();
@@ -23,7 +28,7 @@ export async function getPreferences() {
     'SELECT settings FROM user_preferences WHERE user_id = $1',
     [getLocalUserId()],
   );
-  return { preferences: mergePreferences(result.rows[0]?.settings) };
+  return { preferences: await withDefaults(db, result.rows[0]?.settings) };
 }
 
 // Merge a partial settings patch into the stored preferences.
@@ -52,7 +57,7 @@ export async function updatePreferences(body) {
      RETURNING settings`,
     [getLocalUserId(), JSON.stringify(parsed.values)],
   );
-  return { preferences: mergePreferences(result.rows[0].settings) };
+  return { preferences: await withDefaults(db, result.rows[0].settings) };
 }
 
 // Forget the stored preferences (falls back to defaults).
@@ -61,5 +66,5 @@ export async function resetPreferences() {
   await db.query('DELETE FROM user_preferences WHERE user_id = $1', [
     getLocalUserId(),
   ]);
-  return { preferences: mergePreferences({}) };
+  return { preferences: await withDefaults(db, {}) };
 }

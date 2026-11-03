@@ -3,6 +3,7 @@
 // the evaluation trigger, so completion cannot race an alert insert.
 
 export async function scanAlerts(db) {
+  await db.query('SELECT lock_academic_write()');
   const candidates = await db.query(`
     SELECT s.id
     FROM sessions s
@@ -56,4 +57,26 @@ export async function scanAlerts(db) {
   }
 
   return { raised, resolved };
+}
+
+export function startAlertScanner(pool, { intervalMs = 60_000, onError = console.error } = {}) {
+  let pending = null;
+  const run = () => {
+    if (pending) return;
+    pending = (async () => {
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await scanAlerts(client);
+        await client.query('COMMIT');
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally { client.release(); }
+    })().catch(onError).finally(() => { pending = null; });
+  };
+  const timer = setInterval(run, intervalMs);
+  timer.unref();
+  run();
+  return async () => { clearInterval(timer); await pending; };
 }

@@ -90,14 +90,14 @@ test('getAuditEntries: reads recorded rows, newest first, paginated', async () =
     await createGroup({ name: 'Beta' });
 
     const out = await getAuditEntries();
-    assert.equal(out.total, 2);
-    assert.equal(out.entries.length, 2);
-    // Every row is a group.create by the local actor.
+    assert.equal(out.total, 4); // transactional snapshots plus service summaries
+    assert.equal(out.entries.length, 4);
     assert.ok(out.entries.every((e) => e.action === 'group.create'));
-    assert.ok(out.entries.every((e) => e.actor === 'local'));
+    const summaries = out.entries.filter(e => e.details.source !== 'database');
+    assert.ok(summaries.every((e) => e.actor === 'local'));
     // Newest first: Beta was created last.
-    assert.equal(out.entries[0].details.name, 'Beta');
-    assert.equal(out.entries[1].details.name, 'Alpha');
+    assert.equal(summaries[0].details.name, 'Beta');
+    assert.equal(summaries[1].details.name, 'Alpha');
   } finally {
     await pool.end();
   }
@@ -115,7 +115,7 @@ test('getAuditEntries: filters by category and by actor', async () => {
 
     // Matching category keeps the row.
     const groups = await getAuditEntries({ category: 'group' });
-    assert.equal(groups.total, 1);
+    assert.equal(groups.total, 2);
 
     const inventory = await getAuditEntries({ category: 'cafe_inventory' });
     assert.equal(inventory.total, 1);

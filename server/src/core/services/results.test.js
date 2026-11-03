@@ -64,8 +64,8 @@ async function expectCode(code, fn) {
 
 async function addStudent(pool, code, fullName) {
   const result = await pool.query(
-    `INSERT INTO students (student_code, full_name)
-     VALUES ($1, $2) RETURNING id`,
+    `INSERT INTO students (student_code, full_name,gender,birth_date,father_name,national_id)
+     VALUES ($1, $2,'female','2000-01-01','Test Father',lpad((SELECT count(*)+1 FROM students)::text,10,'0')) RETURNING id`,
     [code, fullName],
   );
   return result.rows[0].id;
@@ -97,7 +97,7 @@ async function seedFixture(pool) {
   for (const [name, studentId] of [['ada', ada], ['bob', bob]]) {
     memberships[name] = (
       await pool.query(
-        `INSERT INTO student_group_members (student_id, group_id, added_at)
+        `INSERT INTO student_group_members (student_id, group_id, joined_on)
          VALUES ($1, $2, '2020-01-01') RETURNING id`,
         [studentId, group],
       )
@@ -257,7 +257,7 @@ test('getResults: group fallback uses each session date and selected-empty shado
   try {
     const { assignmentId, memberships, sessionIds, focus, save } = await seedFixture(pool);
     // Ada belongs on Jan 13 and Jan 20 only. Bob shadows Jan 6 with a blank.
-    await pool.query(`UPDATE student_group_members SET added_at = '2024-01-13', left_on = '2024-01-20' WHERE id = $1`, [memberships.ada]);
+    await pool.query(`UPDATE student_group_members SET joined_on = '2024-01-13', left_on = '2024-01-20' WHERE id = $1`, [memberships.ada]);
     for (let i = 0; i < 5; i++) {
       await save(sessionIds[i], [
         { membershipId: null, parameterId: focus, selected: true, qualityValue: i + 1, quantityValue: i === 1 ? 6 : null },
@@ -273,9 +273,9 @@ test('getResults: group fallback uses each session date and selected-empty shado
     const ada = grid.rows.find(row => row.membershipId === memberships.ada);
     const bob = grid.rows.find(row => row.membershipId === memberships.bob);
     assert.deepEqual(ada.cells, {}, 'Ada left before the current period');
-    assert.deepEqual(ada.previous[focus], { quality: 3, quantity: 6 });
+    assert.deepEqual(ada.previous[focus], { quality: 2.5, quantity: 6 });
     assert.deepEqual(bob.cells[focus], { quality: 5, quantity: null, qualityComment: null, quantityComment: null, answered: true });
-    assert.deepEqual(bob.previous[focus], { quality: 4, quantity: 6 });
+    assert.deepEqual(bob.previous[focus], { quality: 3, quantity: 6 });
   } finally {
     await pool.end();
   }
@@ -341,7 +341,7 @@ test('getTrends: effective members, inclusive dates and empty shadows precede av
       ['DEFGHJKL', 'Dan', '2024-01-13', null],
     ]) {
       const student = await addStudent(pool, code, name);
-      await pool.query('INSERT INTO student_group_members (student_id, group_id, added_at, left_on) VALUES ($1, $2, $3, $4)', [student, group, added, left]);
+      await pool.query('INSERT INTO student_group_members (student_id, group_id, joined_on, left_on) VALUES ($1, $2, $3, $4)', [student, group, added, left]);
     }
     const cell = (membershipId, qualityValue, quantityValue) => ({ membershipId, parameterId: focus, selected: true, qualityValue, quantityValue });
     await save(sessionIds[0], [cell(null, 2, 6), cell(memberships.ada, 8, 4)]);
@@ -350,11 +350,11 @@ test('getTrends: effective members, inclusive dates and empty shadows precede av
     assert.equal(point.count, 3);
     await save(sessionIds[1], [cell(null, 4, 8), cell(memberships.bob, null, null)]);
     point = (await getTrends({ groupId: group })).trends[0];
-    assert.equal(point.average, 4, 'Jan 6: 8,2,2; Jan 13: 4,blank,4');
+    assert.equal(point.average, 3.5, 'member period averages: Ada 6, Bob 2, Charlie 2, Dan 4');
     assert.equal(point.count, 5);
     assert.equal(point.lastSessionDate, '2024-01-13');
     const quantity = (await getTrends({ groupId: group, dimension: 'quantity' })).trends[0];
-    assert.equal(quantity.average, 6.4);
+    assert.equal(quantity.average, 6.5);
     assert.equal(quantity.count, 5);
     // Individual assignments still contribute exactly their own member.
     const individual = (await pool.query(`INSERT INTO assignments (code, teacher_id, interval_id, membership_id, anchor_date)
@@ -383,8 +383,8 @@ test('getSummary: expected = selected cells; group rows expand per member and me
     ]);
     const charlieId = await addStudent(pool, 'CDEFGHJK', 'Charlie Delta');
     await pool.query(
-      `INSERT INTO student_group_members (student_id, group_id)
-       VALUES ($1, $2)`,
+      `INSERT INTO student_group_members (student_id, group_id, joined_on)
+       VALUES ($1, $2, current_date)`,
       [charlieId, group]
     );
 

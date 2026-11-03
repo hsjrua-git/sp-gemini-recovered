@@ -1,4 +1,5 @@
 import pg from 'pg';
+import { attachAuditContext } from '../lib/auditContext.js';
 
 // Return PostgreSQL `date` columns (OID 1082) as raw 'YYYY-MM-DD' strings
 // rather than local-midnight JS Date objects, preventing UTC timezone shifts
@@ -27,4 +28,4 @@ pool.on('error', (err) => {
   console.error('Unexpected PostgreSQL pool error:', err);
 });
 
-export default pool;
+export default attachAuditContext(pool);

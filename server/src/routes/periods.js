@@ -33,12 +33,34 @@ router.get('/periods', async (req, res) => {
     });
   }
 
-  const periods = await listAssignmentPeriods(pool, assignmentId);
+  let periods = await listAssignmentPeriods(pool, assignmentId);
+  if (req.query.includeArchived === '1') {
+    const archived = await pool.query(
+      `SELECT p.id,p.assignment_id AS "assignmentId",p.seq,p.archived_at AS "archivedAt",
+              a.code AS "assignmentCode"
+       FROM periods p JOIN assignments a ON a.id=p.assignment_id
+       WHERE p.archived_at IS NOT NULL AND ($1::uuid IS NULL OR p.assignment_id=$1)
+       ORDER BY p.assignment_id,p.seq`, [assignmentId ?? null],
+    );
+    periods = [...periods, ...archived.rows];
+  }
   res.json({
     periods: userCan(req, 'scores.view')
       ? periods
       : periods.map(({ answeredCount, ...rest }) => rest),
   });
+});
+
+router.put('/periods/:id', async (req, res) => {
+  if (!isUuid(req.params.id) || typeof req.body?.archived !== 'boolean') {
+    return res.status(400).json({ error: 'Choose a period and archived state.', code: 'VALIDATION_INVALID_TYPE' });
+  }
+  const result = await pool.query(
+    `UPDATE periods SET archived_at=CASE WHEN $2 THEN COALESCE(archived_at,now()) ELSE NULL END
+     WHERE id=$1 RETURNING id,archived_at AS "archivedAt"`, [req.params.id, req.body.archived],
+  );
+  if (!result.rowCount) return res.status(404).json({ error: 'Period not found.', code: 'NOT_FOUND' });
+  res.json({ period: result.rows[0] });
 });
 
 export default router;

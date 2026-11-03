@@ -1,5 +1,10 @@
 import { request } from './http.js';
+
 import { hierarchy } from '../lib/hierarchy.js';
+
+export function updateMembershipDates(groupId, membershipId, dates) {
+  return request(`/api/groups/${groupId}/members/${membershipId}`, { method: 'PUT', body: JSON.stringify(dates) });
+}
 
 export async function listGroups({ includeArchived = false } = {}) {
   const query = includeArchived ? '?includeArchived=1' : '';
@@ -35,9 +40,9 @@ export async function listGroupMembers(id) {
   return data.students;
 }
 
-export function updateGroupMembers(id, { add = [], remove = [] }) {
+export function updateGroupMembers(id, { add = [], remove = [], joinedOn, leftOn }) {
   return request(`/api/groups/${id}/members`, {
     method: 'PUT',
-    body: JSON.stringify({ add, remove }),
+    body: JSON.stringify({ add, remove, joinedOn, leftOn }),
   });
 }

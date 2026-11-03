@@ -14,9 +14,8 @@ import { stripRestricted, validateExtra } from '../lib/fields.js';
 import { isUuid } from '../lib/ids.js';
 import { userCan } from '../middleware/auth.js';
 import {
-  classifyImportRows,
+  classifyStoredImport,
   importCounts,
-  nameKey,
   validateImportBody,
 } from '../lib/studentImport.js';
 
@@ -64,7 +63,7 @@ const STUDENT_COLUMNS = `
   created_at   AS "createdAt"
 `;
 
-// Parse the optional identity fields from a request body. Returns
+// Parse the required identity fields from a request body. Returns
 // { values: { gender, birthDate, fatherName, nationalId } } or { error }.
 function parseIdentity(body) {
   const gender = normalizeGender(body?.gender);
@@ -202,7 +201,7 @@ router.get('/', async (req, res) => {
     });
   }
 
-  const conditions = ['deleted_at IS NULL'];
+  const conditions = [req.query.archived === '1' ? 'deleted_at IS NOT NULL' : 'deleted_at IS NULL'];
   const values = [];
 
   if (groupId !== undefined) {
@@ -299,16 +298,8 @@ router.patch('/:id', async (req, res) => {
   }
 
   if (identityPresent.length > 0) {
-    // Validate the whole identity set so one bad field reports first, then
-    // apply only the fields the request actually carries (partial update).
-    const identity = parseIdentity(body);
-    if (identity.error) {
-      return res.status(400).json({
-        error: identity.error,
-        code: identity.code,
-        params: identity.params,
-      });
-    }
+    const normalizers = { gender: normalizeGender, birthDate: normalizeBirthDate,
+      fatherName: normalizeFatherName, nationalId: normalizeNationalId };
     const COLUMN_OF = {
       gender: ['gender', '$::gender_type'],
       birthDate: ['birth_date', '$::date'],
@@ -316,8 +307,10 @@ router.patch('/:id', async (req, res) => {
       nationalId: ['national_id', '$'],
     };
     for (const field of identityPresent) {
+      const parsed = normalizers[field](body[field]);
+      if (parsed.error) return res.status(400).json(parsed);
       const [column, placeholder] = COLUMN_OF[field];
-      values.push(identity.values[field]);
+      values.push(parsed.value);
       sets.push(`${column} = ${placeholder.replace('$', `$${values.length}`)}`);
     }
   }
@@ -379,6 +372,7 @@ router.delete('/:id', async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    await client.query('SELECT lock_academic_write()');
     const student = await client.query(
       `SELECT id FROM students
        WHERE id = $1 AND deleted_at IS NULL
@@ -443,20 +437,8 @@ router.post('/import', async (req, res) => {
   }
   const { rows, allowDuplicateNames, dryRun } = parsed;
 
-  const existingResult = await pool.query(
-    `SELECT full_name    AS "fullName",
-            student_code AS "studentCode"
-     FROM students
-     WHERE deleted_at IS NULL`
-  );
-  const existing = new Map();
-  for (const student of existingResult.rows) {
-    const key = nameKey(student.fullName);
-    if (!existing.has(key)) existing.set(key, student.studentCode);
-  }
-
-  const classified = classifyImportRows({ rows, existing, allowDuplicateNames });
-  const counts = importCounts(classified);
+  let classified = await classifyStoredImport(pool, { rows, allowDuplicateNames });
+  let counts = importCounts(classified);
 
   if (dryRun) {
     return res.json({ dryRun: true, rows: classified, counts });
@@ -473,19 +455,28 @@ router.post('/import', async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    await client.query('SELECT lock_academic_write()');
 
     const created = [];
+    // Reclassify after acquiring the write gate: another import may have
+    // committed the same identity/name since the preview.
+    classified = await classifyStoredImport(client, { rows, allowDuplicateNames });
+    counts = importCounts(classified);
+    if (counts.willImport === 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'There are no rows to import.', code: 'STUDENTS_IMPORT_EMPTY', rows: classified, counts });
+    }
     for (const item of classified) {
       if (!item.willImport) continue;
 
       let student = null;
       for (let attempt = 1; attempt <= 5 && student === null; attempt++) {
         const inserted = await client.query(
-          `INSERT INTO students (student_code, full_name)
-           VALUES ($1, $2)
+          `INSERT INTO students (student_code, full_name, gender, birth_date, father_name, national_id)
+           VALUES ($1, $2, $3, $4, $5, $6)
            ON CONFLICT (student_code) DO NOTHING
            RETURNING ${STUDENT_COLUMNS}`,
-          [generateStudentCode(), item.fullName]
+          [generateStudentCode(), item.fullName, item.gender, item.birthDate, item.fatherName, item.nationalId]
         );
         student = inserted.rows[0] ?? null;
       }
@@ -520,6 +511,12 @@ router.post('/import', async (req, res) => {
   } finally {
     client.release();
   }
+});
+
+router.put('/:id/restore', async (req, res) => {
+  const result = await pool.query('UPDATE students SET deleted_at=NULL WHERE id=$1 RETURNING id', [req.params.id]);
+  if (!result.rowCount) return res.status(404).json({ error: 'Student not found.', code: 'NOT_FOUND' });
+  res.json({ student: result.rows[0] });
 });
 
 export default router;

@@ -27,14 +27,14 @@ export async function readReportResults(db, periodIds, { from = null, to = null 
   const targets = (await db.query(
     `SELECT DISTINCT a.id AS "assignmentId", p.seq AS "periodSeq", ms.id AS "membershipId",
             st.id AS "studentId", st.full_name AS "fullName", st.student_code AS "studentCode",
-            ms.added_at::date::text AS "addedOn", ms.left_on::text AS "leftOn"
+            ms.joined_on::text AS "addedOn", ms.left_on::text AS "leftOn"
      FROM sessions s JOIN periods p ON p.id = s.period_id
      JOIN assignments a ON a.id = s.assignment_id
      JOIN student_group_members ms ON (a.group_id IS NOT NULL AND ms.group_id = a.group_id)
                                   OR ms.id = a.membership_id
      JOIN students st ON st.id = ms.student_id
      WHERE p.id = ANY($1::uuid[]) AND s.archived_at IS NULL AND s.canceled_at IS NULL
-       AND st.deleted_at IS NULL AND ms.added_at::date <= s.session_date
+       AND st.deleted_at IS NULL AND ms.joined_on <= s.session_date
        AND (ms.left_on IS NULL OR ms.left_on >= s.session_date)
        AND ($2::date IS NULL OR s.session_date >= $2) AND ($3::date IS NULL OR s.session_date <= $3)
      ORDER BY st.full_name`, [relevant, from, to]

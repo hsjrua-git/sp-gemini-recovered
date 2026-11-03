@@ -65,6 +65,18 @@ const entry = (membershipId, parameterId, overrides = {}) => ({
 const preview = (entries, problemIndexes = new Set()) =>
   previewCells({ entries, existing, problemIndexes });
 
+test('partial imports preserve omitted fields without echoing hidden scores to blind writers', () => {
+  const entries = [{ membershipId: M2, parameterId: SPEED, selected: true, quantityValue: 4 }];
+  const reader = previewCells({ entries, existing, patch: true, problemIndexes: new Set() })[0];
+  assert.equal(reader.to.qualityValue, 5);
+  assert.equal(reader.to.qualityComment, 'steady');
+  assert.equal(reader.to.quantityValue, 4);
+  const blind = previewCells({ entries, existing, patch: true, canViewScores: false, problemIndexes: new Set() })[0];
+  assert.equal(blind.from, null);
+  assert.deepEqual(blind.to, { selected: true, quantityValue: 4 });
+  assert.equal(blind.lockedAt, undefined);
+});
+
 test('a new cell has no `from`', () => {
   const cells = preview([entry(M1, OPEN, { qualityValue: 4 })]);
   assert.equal(cells[0].status, 'new');

@@ -47,3 +47,14 @@ test('dates outside the conversion library range never crash rendering', () => {
   fireEvent.click(screen.getByRole('button', { name: /shamsi/i }));
   expect(document.querySelector('.shamsi-calendar')).not.toBeNull();
 });
+
+test('Gregorian birth dates outside the Jalali calendar range remain editable', () => {
+  render(<Field required />);
+  const gregorian = document.querySelector('input[type=date]');
+  fireEvent.change(gregorian, { target: { value: '0099-01-05' } });
+  expect(gregorian.value).toBe('0099-01-05');
+  expect(screen.getByRole('form').checkValidity()).toBe(true);
+  fireEvent.click(screen.getByRole('button', { name: /shamsi/i }));
+  expect(document.querySelector('.shamsi-calendar')).not.toBeNull();
+  expect(gregorian.value).toBe('0099-01-05');
+});

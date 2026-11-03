@@ -22,6 +22,7 @@ import {
 import { formatIsoDate, toIsoDate } from '../lib/format.js';
 import HierarchySelect from '../components/HierarchySelect.jsx';
 import EvaluationTasks from '../components/EvaluationTasks.jsx';
+import AcademicRecovery from '../components/AcademicRecovery.jsx';
 import { assignmentTree } from '../lib/hierarchy.js';
 import TreePicker from '../components/TreePicker.jsx';
 
@@ -178,6 +179,8 @@ function EvaluatePage() {
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['evaluations'] }),
+        queryClient.invalidateQueries({ queryKey: ['academic-recovery'] }),
+        queryClient.invalidateQueries({ queryKey: ['export-cube'] }),
         queryClient.invalidateQueries({ queryKey: ['results'] }),
         queryClient.invalidateQueries({ queryKey: ['trends'] }),
         queryClient.invalidateQueries({ queryKey: ['dashboard'] }),
@@ -443,6 +446,7 @@ function EvaluatePage() {
       </label>}
       {!canViewScores && <p className="hint">{t('evaluate.blindHint')}</p>}
       {effectiveSession && <details className="panel evaluation-tasks-disclosure"><summary>{t('recovery:evaluate.tasks')}</summary><EvaluationTasks key={effectiveSession.id} session={effectiveSession} sessions={sessions} /></details>}
+      {effectiveSession && canViewScores && can('scores.enter') && <AcademicRecovery key={effectiveSession.id} kind="evaluations" sessionId={effectiveSession.id} />}
       <p className="hint">
         {t('evaluate.lockHint')}
         {can('scores.override')

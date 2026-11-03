@@ -26,6 +26,7 @@ describe('formatStudentCode', () => {
 describe('toIsoDate', () => {
   it('formats a Date as YYYY-MM-DD with zero padding', () => {
     expect(toIsoDate(new Date(2026, 0, 5))).toBe('2026-01-05');
+    expect(toIsoDate(new Date('0099-01-05T12:00:00'))).toBe('0099-01-05');
   });
 });
 

@@ -9,18 +9,19 @@ import {
   validateImportBody,
 } from '../src/lib/studentImport.js';
 
-const row = (n, fullName) => ({ row: n, fullName });
+const identity = n => ({ gender: 'female', birthDate: '2000-01-01', fatherName: 'Test Father', nationalId: String(1000000000 + n) });
+const row = (n, fullName) => ({ row: n, fullName, ...identity(n) });
 const none = new Map();
 
 test('a valid import request gets its defaults', () => {
   assert.deepEqual(validateImportBody({ rows: [row(2, 'Ana Souza')] }), {
-    rows: [{ row: 2, fullName: 'Ana Souza' }],
+    rows: [row(2, 'Ana Souza')],
     allowDuplicateNames: false,
     dryRun: false,
   });
   assert.deepEqual(
     validateImportBody({ rows: [row(1, 'Ana')], dryRun: true, allowDuplicateNames: true }),
-    { rows: [{ row: 1, fullName: 'Ana' }], allowDuplicateNames: true, dryRun: true }
+    { rows: [row(1, 'Ana')], allowDuplicateNames: true, dryRun: true }
   );
 });
 
@@ -53,6 +54,7 @@ test('valid rows are ok, and names are tidied', () => {
     allowDuplicateNames: false,
   });
   assert.deepEqual(item, {
+    ...identity(2),
     row: 2,
     fullName: 'Ana Souza',
     status: 'ok',

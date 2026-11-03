@@ -97,7 +97,7 @@ router.get('/', async (req, res) => {
               s.id           AS "studentId",
               s.full_name    AS "fullName",
               s.student_code AS "studentCode",
-              ms.added_at::date::text AS "addedOn",
+              ms.joined_on::text AS "addedOn",
               ms.left_on::text AS "leftOn"
        FROM assignments a
        JOIN student_group_members ms
@@ -114,7 +114,7 @@ router.get('/', async (req, res) => {
               AND pp.seq = ANY($2::int[])
               AND ps.archived_at IS NULL
               AND ps.canceled_at IS NULL
-              AND ms.added_at::date <= ps.session_date
+              AND ms.joined_on <= ps.session_date
               AND (ms.left_on IS NULL OR ms.left_on >= ps.session_date)
           )
        ORDER BY lower(s.full_name)`,

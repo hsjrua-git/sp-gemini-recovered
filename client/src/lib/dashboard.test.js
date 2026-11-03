@@ -69,13 +69,13 @@ const results = {
 };
 
 describe('summarize', () => {
-  it('counts completion against the parameters selected anywhere, students only', () => {
+  it('counts only each student’s selected requirements', () => {
     const s = summarize(results);
     expect(s.students).toBe(3); // the whole-group row never counts
     expect(s.parametersInUse).toBe(2); // p3 has no cells anywhere
-    expect(s.expected).toBe(6); // 3 students × 2 in-use params
+    expect(s.expected).toBe(4); // Cid has no selected requirements.
     expect(s.measured).toBe(3); // a:2 + b:1 + c:0 (value basis)
-    expect(s.completion).toBe(50);
+    expect(s.completion).toBe(75);
     expect(s).toMatchObject({ studentsComplete: 1, studentsPartial: 1, studentsNone: 1 });
   });
 
@@ -211,9 +211,8 @@ describe('studentBreakdown', () => {
 describe('unmeasuredStudents', () => {
   it('lists the students who still owe answers, worst first', () => {
     const items = unmeasuredStudents(results);
-    // Cid lacks both, Bea lacks one (p2 selected-unanswered), Ada owes none.
-    expect(items.map((item) => item.fullName)).toEqual(['Cid', 'Bea']);
-    expect(items[0].missing).toEqual(['Speed', 'Strength']);
-    expect(items[1].missing).toEqual(['Strength']);
+    // Cid has no requirements; Bea owes her selected unanswered cell.
+    expect(items.map((item) => item.fullName)).toEqual(['Bea']);
+    expect(items[0].missing).toEqual(['Strength']);
   });
 });

@@ -11,6 +11,8 @@
 // matches it. Locked cells stay flagged (the save path still needs an
 // override), but without the timestamp, which would itself hint at state.
 
+import { effectiveEntry, SCORE_FIELDS } from './evaluationCell.js';
+
 function sameCell(a, b) {
   return (
     (a?.selected ?? false) === (b?.selected ?? false) &&
@@ -36,6 +38,7 @@ export function previewCells({
   existing,
   problemIndexes,
   canViewScores = true,
+  patch = false,
 }) {
   const cells = [];
 
@@ -45,14 +48,18 @@ export function previewCells({
     const row = existing.get(`${entry.membershipId ?? 'group'}:${entry.parameterId}`);
     const from = row
       ? {
-          selected: true,
+          selected: !row.archivedAt,
           qualityValue: row.qualityValue,
           quantityValue: row.quantityValue,
           qualityComment: row.qualityComment,
           quantityComment: row.quantityComment,
         }
       : null;
-    const to = entryCell(entry);
+    const to = entryCell(effectiveEntry(entry, row, patch));
+    const visibleTo = canViewScores || !patch ? to : {
+      selected: entry.selected,
+      ...Object.fromEntries(SCORE_FIELDS.filter(field => Object.hasOwn(entry, field)).map(field => [field, entry[field]])),
+    };
 
     let status;
     if (canViewScores) {
@@ -70,7 +77,7 @@ export function previewCells({
       parameterId: entry.parameterId,
       status,
       from: canViewScores ? from : null,
-      to,
+      to: visibleTo,
       ...(status === 'locked' && canViewScores ? { lockedAt: row.locksAt } : {}),
     });
   });

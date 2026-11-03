@@ -401,13 +401,13 @@ export async function removeConnectedSample(db) {
   );
   await db.query(`DELETE FROM acct_fiscal_periods WHERE name LIKE 'Sample FY %'`);
   await db.query(`DELETE FROM voice_transcripts WHERE session_id = $1`, [TRANSCRIPT_SESSION]);
-  await db.query(`DELETE FROM audit_log WHERE user_id = ANY($1::uuid[])`, [userIds]);
   await db.query(`DELETE FROM task_templates WHERE title LIKE $1`, [`${TASK_PREFIX}%`]);
   await db.query(`DELETE FROM student_field_definitions WHERE label LIKE $1`, [`${FIELD_PREFIX}%`]);
   await db.query(`DELETE FROM saved_views WHERE user_id = ANY($1::uuid[])`, [userIds]);
   await db.query(`DELETE FROM user_preferences WHERE user_id = ANY($1::uuid[])`, [userIds]);
   await db.query(`DELETE FROM user_sessions WHERE (sess->>'userId')::uuid = ANY($1::uuid[])`, [userIds]);
-  await db.query(`DELETE FROM users WHERE id = ANY($1::uuid[])`, [userIds]);
+  // Preserve actors referenced by the append-only audit trail.
+  await db.query(`UPDATE users SET is_active=false WHERE id = ANY($1::uuid[])`, [userIds]);
 
   await db.query('ALTER TABLE acct_journal_entries ENABLE TRIGGER acct_entry_lifecycle_trg');
   await db.query('ALTER TABLE acct_journal_lines ENABLE TRIGGER acct_entry_balance_trg');

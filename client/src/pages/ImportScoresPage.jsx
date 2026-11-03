@@ -430,6 +430,8 @@ function ImportScoresPage() {
           });
           setStage('done');
           queryClient.invalidateQueries({ queryKey: ['evaluations'] });
+          queryClient.invalidateQueries({ queryKey: ['academic-recovery'] });
+          queryClient.invalidateQueries({ queryKey: ['export-cube'] });
           queryClient.invalidateQueries({ queryKey: ['results'] });
           queryClient.invalidateQueries({ queryKey: ['trends'] });
           queryClient.invalidateQueries({ queryKey: ['dashboard'] });

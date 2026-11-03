@@ -7,7 +7,9 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 function dayNumber(isoDate) {
   const [year, month, day] = isoDate.split('-').map(Number);
-  return Date.UTC(year, month - 1, day) / MS_PER_DAY;
+  const date = new Date(0);
+  date.setUTCFullYear(year, month - 1, day);
+  return date.getTime() / MS_PER_DAY;
 }
 
 function isoDateFromDayNumber(days) {
@@ -18,7 +20,7 @@ export function isValidIsoDate(text) {
   if (typeof text !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(text)) {
     return false;
   }
-  return isoDateFromDayNumber(dayNumber(text)) === text;
+  return text.slice(0, 4) !== '0000' && isoDateFromDayNumber(dayNumber(text)) === text;
 }
 
 export function todayIso(now = new Date()) {
@@ -53,6 +55,7 @@ export async function listAssignmentPeriods(db, assignmentId = null) {
      )
       SELECT ps.period_id AS id,
              ps.assignment_id AS "assignmentId",
+             assignment.code AS "assignmentCode",
             ps.seq,
             NULL::timestamptz AS "archivedAt",
             ps.sessions_count::int AS "sessionCount",
@@ -60,7 +63,8 @@ export async function listAssignmentPeriods(db, assignmentId = null) {
             ps.started_on::text AS "startDate",
             ps.ended_on::text AS "endDate",
             COALESCE(a.answered, 0) AS "answeredCount"
-     FROM period_summary ps
+      FROM period_summary ps
+      JOIN assignments assignment ON assignment.id=ps.assignment_id
      LEFT JOIN answered a ON a.period_id = ps.period_id
       WHERE ($1::uuid IS NULL OR ps.assignment_id = $1)
       ORDER BY ps.assignment_id, ps.seq`,

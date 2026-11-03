@@ -12,6 +12,7 @@ import ImportSteps from '../components/ImportSteps.jsx';
 import { UploadIcon } from '../components/icons.jsx';
 import { createdStudentsCsvRows } from '../lib/exports.js';
 import { formatStudentCode, toIsoDate } from '../lib/format.js';
+import { IDENTITY_COLUMNS, guessIdentityColumns, includeStudentIdentity } from '../lib/studentImport.js';
 import {
   buildNames,
   guessColumns,
@@ -47,7 +48,7 @@ function describeRow(t, item) {
   );
 }
 
-function ColumnSelect({ label, value, onChange, columnCount, headerCells }) {
+function ColumnSelect({ label, value, onChange, columnCount, headerCells, allowEmpty = false }) {
   const { t } = useTranslation(['students', 'common']);
   return (
     <label className="inline">
@@ -56,6 +57,7 @@ function ColumnSelect({ label, value, onChange, columnCount, headerCells }) {
         value={value}
         onChange={(event) => onChange(Number(event.target.value))}
       >
+        {allowEmpty && <option value={-1}>{t('detail.notSet')}</option>}
         {Array.from({ length: columnCount }, (_, index) => (
           <option key={index} value={index}>
             {columnLabel(t, index, headerCells)}
@@ -78,6 +80,7 @@ function ImportStudentsPage() {
   const [mode, setMode] = useState('single');
   const [firstColumn, setFirstColumn] = useState(0);
   const [secondColumn, setSecondColumn] = useState(1);
+  const [identityColumns, setIdentityColumns] = useState(() => guessIdentityColumns());
   const [allowDuplicates, setAllowDuplicates] = useState(false);
   const [stage, setStage] = useState('choose');
   const [done, setDone] = useState(null);
@@ -92,14 +95,14 @@ function ImportStudentsPage() {
   const headerCells = hasHeader ? rows[0]?.cells : null;
   const names = useMemo(
     () =>
-      buildNames({
+      includeStudentIdentity(buildNames({
         rows,
         hasHeader,
         mode,
         firstColumn,
         secondColumn: mode === 'two' ? secondColumn : null,
-      }),
-    [rows, hasHeader, mode, firstColumn, secondColumn]
+      }), rows, identityColumns),
+    [rows, hasHeader, mode, firstColumn, secondColumn, identityColumns]
   );
 
   function startOver() {
@@ -110,6 +113,7 @@ function ImportStudentsPage() {
     setMode('single');
     setFirstColumn(0);
     setSecondColumn(1);
+    setIdentityColumns(guessIdentityColumns());
     setAllowDuplicates(false);
     setStage('choose');
     setDone(null);
@@ -148,6 +152,7 @@ function ImportStudentsPage() {
     setMode(guess.mode);
     setFirstColumn(guess.firstColumn);
     setSecondColumn(guess.secondColumn ?? 1);
+    setIdentityColumns(guessIdentityColumns(header ? prepared[0].cells : []));
   }
 
   function handleCheck() {
@@ -295,6 +300,14 @@ function ImportStudentsPage() {
                     headerCells={headerCells}
                   />
                 )}
+              </div>
+
+              <p className="hint">{t('imports.students.identityHint')}</p>
+              <div className="pref-group">
+                {IDENTITY_COLUMNS.map(field => <ColumnSelect key={field}
+                  label={t(`detail.${field}`)} value={identityColumns[field]}
+                  onChange={value => setIdentityColumns(current => ({ ...current, [field]: value }))}
+                  columnCount={columnCount} headerCells={headerCells} allowEmpty />)}
               </div>
 
               {tooMany && (

@@ -37,9 +37,8 @@ import { descendantGroupIds } from '../../lib/groups.js';
 import { stripRestricted, validateExtra } from '../../lib/fields.js';
 import { isUuid } from '../../lib/ids.js';
 import {
-  classifyImportRows,
+  classifyStoredImport,
   importCounts,
-  nameKey,
   validateImportBody,
 } from '../../lib/studentImport.js';
 
@@ -111,7 +110,7 @@ async function insertWithUniqueCode(db, columns, values, extra) {
   return null;
 }
 
-// Create a student. `input` = { fullName, gender?, birthDate?, fatherName?, nationalId?, extra? }.
+// Create a student. Identity fields are required; custom extra fields are optional.
 export async function createStudent(input = {}) {
   const db = getDb();
 
@@ -416,20 +415,8 @@ export async function importStudents(input) {
   if (parsed.error) throw ServiceError.validation(parsed.error);
   const { rows, allowDuplicateNames, dryRun } = parsed;
 
-  const existingResult = await db.query(
-    `SELECT full_name    AS "fullName",
-            student_code AS "studentCode"
-     FROM students
-     WHERE deleted_at IS NULL`,
-  );
-  const existing = new Map();
-  for (const student of existingResult.rows) {
-    const key = nameKey(student.fullName);
-    if (!existing.has(key)) existing.set(key, student.studentCode);
-  }
-
-  const classified = classifyImportRows({ rows, existing, allowDuplicateNames });
-  const counts = importCounts(classified);
+  let classified = await classifyStoredImport(db, { rows, allowDuplicateNames });
+  let counts = importCounts(classified);
 
   if (dryRun) {
     return { dryRun: true, rows: classified, counts };
@@ -441,16 +428,20 @@ export async function importStudents(input) {
   const client = await db.connect();
   try {
     await client.query('BEGIN');
+    await client.query('SELECT lock_academic_write()');
 
     const created = [];
+    classified = await classifyStoredImport(client, { rows, allowDuplicateNames });
+    counts = importCounts(classified);
+    if (counts.willImport === 0) throw ServiceError.validation('There are no rows to import.');
     for (const item of classified) {
       if (!item.willImport) continue;
 
       const student = await insertWithUniqueCode(
         client,
-        'student_code, full_name',
-        '$1, $2',
-        (code) => [code, item.fullName],
+        'student_code, full_name, gender, birth_date, father_name, national_id',
+        '$1, $2, $3, $4, $5, $6',
+        (code) => [code, item.fullName, item.gender, item.birthDate, item.fatherName, item.nationalId],
       );
       if (student === null) {
         throw ServiceError.conflict('Could not create a unique student code.');

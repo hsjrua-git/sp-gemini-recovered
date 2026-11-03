@@ -22,11 +22,11 @@ export function normalizeFullName(input) {
   return { value: name };
 }
 
-// The identity fields below are all optional: absent, null and '' mean "not
-// set" (stored as NULL). Every normalizer returns { value } or { error }.
+// Identity is required for every student, including edits and CSV imports.
+const required = (field) => ({ error: `${field} is required.`, code: 'VALIDATION_REQUIRED' });
 
 export function normalizeGender(input) {
-  if (input === undefined || input === null || input === '') return { value: null };
+  if (input === undefined || input === null || input === '') return required('Gender');
   if (input === 'male' || input === 'female') return { value: input };
   return {
     error: 'Gender must be "male" or "female".',
@@ -35,7 +35,7 @@ export function normalizeGender(input) {
 }
 
 export function normalizeBirthDate(input) {
-  if (input === undefined || input === null || input === '') return { value: null };
+  if (input === undefined || input === null || input === '') return required('Birth date');
   if (typeof input !== 'string' || !isValidIsoDate(input)) {
     return {
       error: 'Birth date must be a valid date (YYYY-MM-DD).',
@@ -52,7 +52,7 @@ export function normalizeBirthDate(input) {
 }
 
 export function normalizeFatherName(input) {
-  if (input === undefined || input === null || input === '') return { value: null };
+  if (input === undefined || input === null || input === '') return required('Father name');
   if (typeof input !== 'string') {
     return {
       error: 'Father name must be text.',
@@ -78,7 +78,7 @@ export function normalizeFatherName(input) {
 }
 
 export function normalizeNationalId(input) {
-  if (input === undefined || input === null || input === '') return { value: null };
+  if (input === undefined || input === null || input === '') return required('National ID');
   if (typeof input !== 'string' || !/^[0-9]{10}$/.test(input)) {
     return {
       error: 'National ID must be exactly 10 digits.',
@@ -87,4 +87,17 @@ export function normalizeNationalId(input) {
     };
   }
   return { value: input };
+}
+
+export function parseStudentIdentity(input = {}) {
+  const values = {};
+  for (const [field, normalize] of Object.entries({
+    gender: normalizeGender, birthDate: normalizeBirthDate,
+    fatherName: normalizeFatherName, nationalId: normalizeNationalId,
+  })) {
+    const parsed = normalize(input[field]);
+    if (parsed.error) return parsed;
+    values[field] = parsed.value;
+  }
+  return { values };
 }

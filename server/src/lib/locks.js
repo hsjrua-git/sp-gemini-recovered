@@ -1,3 +1,5 @@
+import { effectiveEntry } from './evaluationCell.js';
+
 export const NORMAL_LOCK_DAYS = 7;
 export const LATE_LOCK_DAYS = 1;
 export const MIN_REASON = 5;
@@ -13,21 +15,18 @@ export function lockDaysFor({ sessionDate, today }) {
     const [y, m, d] = iso.split('-').map(Number);
     return Date.UTC(y, m - 1, d) / MS_PER_DAY;
   };
-  return day(sessionDate) + NORMAL_LOCK_DAYS >= day(today)
+  return day(sessionDate) + NORMAL_LOCK_DAYS > day(today)
     ? NORMAL_LOCK_DAYS
     : LATE_LOCK_DAYS;
 }
 
 // The timestamp a row's locks_at gets: the session's effective date plus its
 // window. Returns an ISO string so pg stores it exactly.
-export function locksAtFor({ sessionDate, today }) {
-  const MS_PER_DAY = 24 * 60 * 60 * 1000;
-  const day = (iso) => {
-    const [y, m, d] = iso.split('-').map(Number);
-    return Date.UTC(y, m - 1, d) / MS_PER_DAY;
-  };
-  const at = (day(sessionDate) + lockDaysFor({ sessionDate, today })) * MS_PER_DAY;
-  return new Date(at).toISOString();
+export function locksAtFor({ sessionDate, firstAnsweredAt = null }) {
+  if (firstAnsweredAt === null) return null;
+  const week = Date.parse(`${sessionDate}T00:00:00Z`) + NORMAL_LOCK_DAYS * 86400000;
+  const answer = Date.parse(firstAnsweredAt);
+  return new Date(answer < week ? week : answer + LATE_LOCK_DAYS * 86400000).toISOString();
 }
 
 // A cell key covers the whole target now: the membership (or the literal
@@ -36,7 +35,7 @@ export function cellKey(membershipId, parameterId) {
   return `${membershipId ?? 'group'}:${parameterId}`;
 }
 
-export function findLockedChanges({ entries, existing, canViewScores = true }) {
+export function findLockedChanges({ entries, existing, canViewScores = true, patch = false }) {
   const locked = [];
   entries.forEach((entry, index) => {
     const row = existing.get(cellKey(entry.membershipId, entry.parameterId));
@@ -44,8 +43,9 @@ export function findLockedChanges({ entries, existing, canViewScores = true }) {
     // A blind writer must get the same lock response for correct and incorrect
     // guesses. Equality is a no-op exemption only for readers of the scores.
     if (canViewScores) {
+      entry = effectiveEntry(entry, row, patch);
       const changed =
-        (entry.selected ?? true) !== (row.selected ?? true) ||
+        (entry.selected ?? true) !== (row.selected ?? !row.archivedAt) ||
         entry.qualityValue !== row.qualityValue ||
         entry.quantityValue !== row.quantityValue ||
         (entry.qualityComment ?? null) !== (row.qualityComment ?? null) ||

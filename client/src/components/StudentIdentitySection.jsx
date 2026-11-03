@@ -43,7 +43,11 @@ function StudentIdentitySection({ student }) {
 
   function handleSubmit(event) {
     event.preventDefault();
-    if (nationalId !== '' && !/^[0-9]{10}$/.test(nationalId)) {
+    if (!gender || !birthDate || !fatherName.trim() || !nationalId) {
+      setProblem(t('workflows:identity.required'));
+      return;
+    }
+    if (!/^[0-9]{10}$/.test(nationalId)) {
       setProblem(t('detail.nationalIdProblem'));
       return;
     }
@@ -60,6 +64,7 @@ function StudentIdentitySection({ student }) {
           <label htmlFor="student-gender">{t('detail.gender')}</label>
           <select
             id="student-gender"
+            required
             value={gender}
             onChange={(event) => setGender(event.target.value)}
             disabled={save.isPending}
@@ -72,6 +77,7 @@ function StudentIdentitySection({ student }) {
           <label htmlFor="student-birth-date">{t('detail.birthDate')}</label>
           <JalaliDatePicker
             id="student-birth-date"
+            required
             value={birthDate}
             onChange={setBirthDate}
             disabled={save.isPending}
@@ -80,6 +86,8 @@ function StudentIdentitySection({ student }) {
           <label htmlFor="student-father-name">{t('detail.fatherName')}</label>
           <input
             id="student-father-name"
+            required
+            minLength={2}
             value={fatherName}
             onChange={(event) => setFatherName(event.target.value)}
             maxLength={100}
@@ -90,6 +98,7 @@ function StudentIdentitySection({ student }) {
           <label htmlFor="student-national-id">{t('detail.nationalId')}</label>
           <input
             id="student-national-id"
+            required
             value={nationalId}
             onChange={(event) => setNationalId(toLatinDigits(event.target.value))}
             inputMode="numeric"

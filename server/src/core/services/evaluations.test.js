@@ -66,8 +66,8 @@ async function expectCode(code, fn) {
 // student_code must match ^[2-9A-HJ-NP-Z]{8}$.
 async function addStudent(pool, code, fullName) {
   const result = await pool.query(
-    `INSERT INTO students (student_code, full_name)
-     VALUES ($1, $2) RETURNING id`,
+    `INSERT INTO students (student_code, full_name,gender,birth_date,father_name,national_id)
+     VALUES ($1, $2,'female','2000-01-01','Test Father',lpad((SELECT count(*)+1 FROM students)::text,10,'0')) RETURNING id`,
     [code, fullName],
   );
   return result.rows[0].id;
@@ -107,7 +107,7 @@ async function seedSchedule(pool) {
   for (const [name, studentId] of [['ada', ada], ['bob', bob]]) {
     memberships[name] = (
       await pool.query(
-        `INSERT INTO student_group_members (student_id, group_id, added_at)
+        `INSERT INTO student_group_members (student_id, group_id, joined_on)
          VALUES ($1, $2, '2020-01-01') RETURNING id`,
         [studentId, group],
       )
@@ -350,7 +350,7 @@ test('group targets are memberships active on the session date, not today', asyn
     await pool.query(
       `UPDATE student_group_members
        SET left_on = NULL,
-           added_at = (SELECT session_date + 1 FROM sessions WHERE id = $2)
+           joined_on = (SELECT session_date + 1 FROM sessions WHERE id = $2)
        WHERE id = $1`,
       [memberships.bob, sessionId]
     );
@@ -448,7 +448,7 @@ test('dryRun previews without writing and is never redacted', async () => {
   }
 });
 
-test('a save creates cells; identical re-save is a no-op; unselect deletes', async () => {
+test('save and partial import preserve omitted fields and first-answer history through unselect/restore', async () => {
   const pool = await freshDb();
   try {
     const { sessionId, memberships } = await seedSchedule(pool);
@@ -489,7 +489,18 @@ test('a save creates cells; identical re-save is a no-op; unselect deletes', asy
       1,
     );
 
-    // Unselecting the whole-group row deletes it (a stored row IS the expectation).
+    const patch = { membershipId: null, parameterId: p.id, selected: true, quantityValue: 9 };
+    await saveEvaluationsBulk({ sessionId, source: 'import', entries: [patch] });
+    const imported = (await getEvaluations({ sessionId })).evaluations.find(row => row.id === groupRow.id);
+    assert.equal(imported.qualityValue, 6);
+    assert.equal(imported.quantityValue, 9);
+    assert.equal(imported.qualityComment, 'good');
+    assert.deepEqual(imported.locksAt, groupRow.locksAt);
+    assert.deepEqual(imported.firstAnsweredAt, groupRow.firstAnsweredAt);
+    assert.equal(adaRow.locksAt, null);
+    assert.equal(adaRow.isLocked, false);
+
+    // Unselection removes the expectation but retains its history.
     const unselected = await saveEvaluationsBulk({
       sessionId,
       entries: [
@@ -500,6 +511,16 @@ test('a save creates cells; identical re-save is a no-op; unselect deletes', asy
     const after = (await getEvaluations({ sessionId })).evaluations;
     assert.equal(after.length, 1);
     assert.equal(after[0].membershipId, memberships.ada);
+    const history = (await pool.query('SELECT archived_at,quality_value,locks_at FROM evaluations WHERE id=$1', [groupRow.id])).rows[0];
+    assert.ok(history.archived_at);
+    assert.equal(history.quality_value, 6);
+    assert.deepEqual(history.locks_at, groupRow.locksAt);
+    await saveEvaluationsBulk({ sessionId, source: 'import', entries: [patch] });
+    const restored = (await getEvaluations({ sessionId })).evaluations.find(row => row.id === groupRow.id);
+    assert.equal(restored.qualityValue, 6);
+    assert.equal(restored.quantityValue, 9);
+    assert.equal(restored.qualityComment, 'good');
+    assert.deepEqual(restored.locksAt, groupRow.locksAt);
   } finally {
     await pool.end();
   }
@@ -549,10 +570,11 @@ test('a locked cell needs a written override reason (audited)', async () => {
     const { sessionId, memberships } = await seedSchedule(pool);
     const p = await createParameter({ code: 'focus', name: 'Focus', minValue: 0, maxValue: 10 });
 
-    // Hand-insert an already-locked cell (locks_at in the past).
+    // A historical first answer to a historical occurrence is already locked.
+    await pool.query("UPDATE sessions SET moved_to=current_date-20 WHERE id=$1", [sessionId]);
     await pool.query(
-      `INSERT INTO evaluations (session_id, parameter_id, membership_id, quality_value, locks_at)
-       VALUES ($1, $2, $3, 4, now() - interval '1 day')`,
+      `INSERT INTO evaluations (session_id, parameter_id, membership_id, quality_value, first_answered_at)
+       VALUES ($1, $2, $3, 4, now() - interval '2 days')`,
       [sessionId, p.id, memberships.ada],
     );
 

@@ -40,7 +40,8 @@ function inUseParameters(results) {
 }
 
 function forRow(parameters, row) {
-  return row.expectedParameterIds ? parameters.filter(p => row.expectedParameterIds.includes(p.id)) : parameters;
+  return parameters.filter(p => row.expectedParameterIds
+    ? row.expectedParameterIds.includes(p.id) : row.cells[p.id] !== undefined);
 }
 
 // Keep an explicit saved choice when it still exists. Otherwise prefer the

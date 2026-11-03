@@ -11,6 +11,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { studentIdentity } from '../../../test/fixtures/identity.js';
 
 import { createPglitePool } from '../../db/pglite.js';
 import { initDb } from '../db.js';
@@ -69,7 +70,7 @@ async function expectCode(code, fn) {
 test('create returns a student with a generated code and uuid', async () => {
   const pool = await freshDb();
   try {
-    const student = await createStudent({ fullName: '  Ada   Lovelace ' });
+    const student = await createStudent({ ...studentIdentity(), fullName: '  Ada   Lovelace ' });
     assert.match(student.id, /^[0-9a-f-]{36}$/i);
     assert.equal(student.fullName, 'Ada Lovelace'); // normalised whitespace
     assert.match(student.studentCode, /^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{8}$/);
@@ -93,7 +94,7 @@ test('create rejects an invalid name with VALIDATION', async () => {
 test('get / update / soft-delete round-trip', async () => {
   const pool = await freshDb();
   try {
-    const created = await createStudent({ fullName: 'Grace Hopper' });
+    const created = await createStudent({ ...studentIdentity(), fullName: 'Grace Hopper' });
 
     const fetched = await getStudent(created.id);
     assert.equal(fetched.id, created.id);
@@ -113,7 +114,7 @@ test('get / update / soft-delete round-trip', async () => {
 test('immutable code and empty update are rejected', async () => {
   const pool = await freshDb();
   try {
-    const created = await createStudent({ fullName: 'Alan Turing' });
+    const created = await createStudent({ ...studentIdentity(), fullName: 'Alan Turing' });
     await expectCode('VALIDATION', () =>
       updateStudent(created.id, { studentCode: 'AAAAAAAA' }),
     );
@@ -136,9 +137,9 @@ test('malformed id reads as NOT_FOUND, not a crash', async () => {
 test('list supports search, sort and paging', async () => {
   const pool = await freshDb();
   try {
-    await createStudent({ fullName: 'Katherine Johnson' });
-    await createStudent({ fullName: 'Dorothy Vaughan' });
-    const mary = await createStudent({ fullName: 'Mary Jackson' });
+    await createStudent({ ...studentIdentity(), fullName: 'Katherine Johnson' });
+    await createStudent({ ...studentIdentity(), fullName: 'Dorothy Vaughan' });
+    const mary = await createStudent({ ...studentIdentity(), fullName: 'Mary Jackson' });
 
     const all = await listStudents({ sort: 'name' });
     assert.equal(all.total, 3);
@@ -177,6 +178,7 @@ test('custom extra fields validate, persist and clear', async () => {
     const fieldId = def.rows[0].id;
 
     const created = await createStudent({
+      ...studentIdentity(),
       fullName: 'Edsger Dijkstra',
       extra: { [fieldId]: 'Eddie' },
     });
@@ -184,7 +186,7 @@ test('custom extra fields validate, persist and clear', async () => {
 
     // Unknown field id is rejected.
     await expectCode('VALIDATION', () =>
-      createStudent({ fullName: 'Some One', extra: { 'bad-id': 'x' } }),
+      createStudent({ ...studentIdentity(), fullName: 'Some One', extra: { 'bad-id': 'x' } }),
     );
 
     // Clearing: sending the key as '' removes it.
@@ -199,9 +201,9 @@ test('import dry-run classifies without writing; real run inserts + audits', asy
   const pool = await freshDb();
   try {
     const rows = [
-      { row: 1, fullName: 'Barbara Liskov' },
-      { row: 2, fullName: 'Barbara Liskov' }, // duplicate within the file
-      { row: 3, fullName: 'x' }, // invalid
+      { ...studentIdentity(), row: 1, fullName: 'Barbara Liskov' },
+      { ...studentIdentity(), row: 2, fullName: 'Barbara Liskov' }, // duplicate within the file
+      { ...studentIdentity(), row: 3, fullName: 'x' }, // invalid
     ];
 
     const dry = await importStudents({ rows, dryRun: true });

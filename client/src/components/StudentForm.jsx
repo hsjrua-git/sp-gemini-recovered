@@ -71,7 +71,7 @@ function StudentForm() {
         />
       </div>
 
-      <StudentIdentityInputs value={identity} onChange={setIdentity} disabled={mutation.isPending} idPrefix="new-student" />
+      <StudentIdentityInputs value={identity} onChange={setIdentity} disabled={mutation.isPending} required idPrefix="new-student" />
 
       <StudentFieldInputs
         definitions={definitions}

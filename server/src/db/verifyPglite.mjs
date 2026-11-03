@@ -73,8 +73,8 @@ async function runSanityChecks(pool) {
 
   // gen_random_uuid() default + now() default on insert.
   const inserted = await pool.query(
-    `INSERT INTO students (student_code, full_name)
-     VALUES ('23456789', 'Test Student')
+    `INSERT INTO students (student_code, full_name,gender,birth_date,father_name,national_id)
+     VALUES ('23456789', 'Test Student','female','2000-01-01','Test Father','1000000001')
      RETURNING id, created_at`,
   );
   const { id, created_at: createdAt } = inserted.rows[0];
@@ -87,7 +87,8 @@ async function runSanityChecks(pool) {
   await expectReject(
     pool,
     'student_code_format CHECK',
-    `INSERT INTO students (student_code, full_name) VALUES ('00000000', 'Bad Code')`,
+    `INSERT INTO students (student_code, full_name,gender,birth_date,father_name,national_id)
+     VALUES ('00000000', 'Bad Code','female','2000-01-01','Test Father','1000000002')`,
   );
 
   // Seeded roles from migrations 010, 026 (Accountant), and 027 (Kiosk).
@@ -215,7 +216,7 @@ async function runSanityChecks(pool) {
   // Adapted schema-4 runtime guards: membership/target validity, lock override,
   // session lifecycle/identity, task targeting, and completion helpers.
   const membership = await pool.query(
-    `INSERT INTO student_group_members (student_id, group_id, added_at)
+    `INSERT INTO student_group_members (student_id, group_id, joined_on)
      VALUES ($1, $2, '2026-01-01') RETURNING id`,
     [id, alphaGroup.rows[0].id],
   );
@@ -263,9 +264,16 @@ async function runSanityChecks(pool) {
     pendingComplete.rows[0].outside_period === true
   ) pass('selected empty cell is incomplete and outside every period');
   else fail('selected empty cell was incorrectly complete');
+  const emptyDeadline = await pool.query('SELECT locks_at FROM evaluations WHERE id=$1', [evaluation.rows[0].id]);
+  if (emptyDeadline.rows[0].locks_at === null) pass('unanswered selection has no lock deadline');
+  else fail('unanswered selection was locked');
+  await pool.query('DELETE FROM evaluations WHERE id=$1', [evaluation.rows[0].id]);
+  await pool.query('UPDATE sessions SET moved_to=current_date-20 WHERE id=$1', [session.rows[0].id]);
+  await pool.query('UPDATE student_group_members SET joined_on=current_date-30 WHERE id=$1', [membership.rows[0].id]);
   await pool.query(
-    `UPDATE evaluations SET locks_at = now() - interval '1 day' WHERE id = $1`,
-    [evaluation.rows[0].id],
+    `INSERT INTO evaluations (id,session_id,parameter_id,membership_id,quality_value,first_answered_at)
+     VALUES ($1,$2,$3,$4,70,now()-interval '2 days')`,
+    [evaluation.rows[0].id,session.rows[0].id,parameter.rows[0].id,membership.rows[0].id],
   );
   await expectReject(
     pool,
@@ -349,7 +357,7 @@ async function runSanityChecks(pool) {
     [individualSession.rows[0].id, parameter.rows[0].id],
   );
   const wrongMembership = await pool.query(
-    `INSERT INTO student_group_members (student_id, group_id, added_at)
+    `INSERT INTO student_group_members (student_id, group_id, joined_on)
      VALUES ($1, $2, '2026-01-01') RETURNING id`,
     [id, betaGroup.rows[0].id],
   );

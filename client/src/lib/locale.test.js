@@ -32,6 +32,13 @@ describe('dates', () => {
     expect(formatLocaleDate('2026-10-25', 'en')).toContain('2026');
   });
 
+  it('renders early birth years without shifting centuries and rejects invalid dates', () => {
+    expect(formatBothDates('0099-01-01', 'en')).toMatch(/^Jan 1, 99 \(/);
+    expect(formatLocaleDate('0004-02-29', 'en')).toContain('Feb 29, 4');
+    expect(formatBothDates('0099-02-29', 'en')).toBe('—');
+    expect(formatBothDates('0000-01-01', 'fa')).toBe('—');
+  });
+
   it('shows both calendars side by side, active language first', () => {
     const fa = formatBothDates('2026-10-25', 'fa');
     expect(fa).toContain('۱۴۰۵');

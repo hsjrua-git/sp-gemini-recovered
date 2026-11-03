@@ -173,8 +173,8 @@ export function buildImport({
           membershipId: student.membershipId,
           parameterId: parameter.id,
           selected: true,
-          qualityValue: parsed.quality ?? null,
-          quantityValue: parsed.quantity ?? null,
+           ...('quality' in parsed ? { qualityValue: parsed.quality } : {}),
+           ...('quantity' in parsed ? { quantityValue: parsed.quantity } : {}),
         });
         refs.push({ row, parameterId: parameter.id });
       }

@@ -1,4 +1,4 @@
-import { normalizeFullName } from '../validation/student.js';
+import { normalizeFullName, parseStudentIdentity } from '../validation/student.js';
 
 export const MAX_IMPORT_ROWS = 500;
 
@@ -62,28 +62,39 @@ export function validateImportBody(body) {
       };
     }
     seenRows.add(item.row);
-    cleaned.push({ row: item.row, fullName: item.fullName });
+    cleaned.push({ row: item.row, fullName: item.fullName,
+      gender: item.gender, birthDate: item.birthDate, fatherName: item.fatherName, nationalId: item.nationalId });
   }
   return { rows: cleaned, allowDuplicateNames, dryRun };
 }
 
-export function classifyImportRows({ rows, existing, allowDuplicateNames }) {
+export function classifyImportRows({ rows, existing, existingNationalIds = new Set(), allowDuplicateNames }) {
   const firstSeen = new Map();
+  const nationalIds = new Set(existingNationalIds);
 
-  return rows.map(({ row, fullName }) => {
+  return rows.map(({ row, fullName, ...identity }) => {
     const parsed = normalizeFullName(fullName);
-    if (parsed.error) {
+    const parsedIdentity = parseStudentIdentity(identity);
+    const problem = parsed.error ? parsed : parsedIdentity.error ? parsedIdentity : null;
+    if (problem) {
       return {
         row,
         fullName: fullName.trim(),
         status: 'invalid',
-        message: parsed.error,
+        message: problem.error,
+        code: problem.code,
         existingCode: null,
         willImport: false,
       };
     }
 
     const name = parsed.value;
+    if (nationalIds.has(parsedIdentity.values.nationalId)) {
+      return { row, fullName: name, ...parsedIdentity.values, status: 'invalid',
+        message: 'National ID already exists in the database or this file.', code: 'VALIDATION_NOT_UNIQUE',
+        existingCode: null, willImport: false };
+    }
+    nationalIds.add(parsedIdentity.values.nationalId);
     const key = nameKey(name);
     let status = 'ok';
     let message = '';
@@ -102,6 +113,7 @@ export function classifyImportRows({ rows, existing, allowDuplicateNames }) {
     return {
       row,
       fullName: name,
+      ...parsedIdentity.values,
       status,
       message,
       existingCode,
@@ -125,4 +137,18 @@ export function importCounts(classified) {
     else counts.skipped++;
   }
   return counts;
+}
+
+export async function classifyStoredImport(db, input) {
+  const stored = await db.query(
+    `SELECT full_name AS "fullName", student_code AS "studentCode", national_id AS "nationalId"
+     FROM students`,
+  );
+  const existing = new Map();
+  for (const student of stored.rows) {
+    const key = nameKey(student.fullName);
+    if (!existing.has(key)) existing.set(key, student.studentCode);
+  }
+  return classifyImportRows({ ...input, existing,
+    existingNationalIds: new Set(stored.rows.map(student => student.nationalId)) });
 }

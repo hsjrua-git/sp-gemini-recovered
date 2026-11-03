@@ -129,7 +129,7 @@ function JalaliDatePicker({ id, value, onChange, disabled = false, required = fa
       return;
     }
     const iso = isoFromJalaliText(text);
-    if (iso === null || (min && iso < min) || (max && iso > max)) {
+    if (iso === null || (minimum && iso < minimum) || (maximum && iso > maximum)) {
       setJalaliInvalid(true);
       onChange('');
       return;
@@ -150,8 +150,8 @@ function JalaliDatePicker({ id, value, onChange, disabled = false, required = fa
         onChange={(event) => choose(event.target.value)}
         disabled={disabled}
         required={required}
-        min={min}
-        max={max}
+        min={minimum}
+        max={maximum}
         aria-label={t('date.gregorian')}
       />
       <input

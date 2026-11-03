@@ -142,4 +142,10 @@ router.patch('/:id', async (req, res) => {
   res.json({ alert: full.rows[0] });
 });
 
+router.delete('/:id', async (req, res) => {
+  const result = await pool.query('DELETE FROM alerts WHERE id=$1 RETURNING id', [req.params.id]);
+  if (!result.rowCount) return res.status(404).json({ error: 'Alert not found.', code: 'NOT_FOUND' });
+  res.status(204).end();
+});
+
 export default router;

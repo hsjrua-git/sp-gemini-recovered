@@ -127,8 +127,8 @@ try {
   await client.query('SAVEPOINT archived_student_probe');
   const archivalStudent = (
     await client.query(
-      `INSERT INTO students (student_code, full_name)
-       VALUES ($1, 'ZZ Void Archive') RETURNING id`,
+      `INSERT INTO students (student_code, full_name,gender,birth_date,father_name,national_id)
+       VALUES ($1, 'ZZ Void Archive','female','2000-01-01','Test Father','9876543210') RETURNING id`,
       [generateStudentCode()]
     )
   ).rows[0];

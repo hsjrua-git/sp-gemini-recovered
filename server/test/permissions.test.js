@@ -76,13 +76,16 @@ const ROUTES = [
   { method: 'GET', path: `/api/students/${NIL}` },
   { method: 'PATCH', path: `/api/students/${NIL}`, body: { fullName: 'x' } },
   { method: 'DELETE', path: `/api/students/${NIL}` },
+  { method: 'PUT', path: `/api/students/${NIL}/restore` },
   { method: 'POST', path: '/api/students/import', body: { rows: [] } },
   { method: 'GET', path: '/api/parameters' },
   { method: 'POST', path: '/api/parameters', body: {} },
   { method: 'PATCH', path: `/api/parameters/${NIL}`, body: {} },
   { method: 'GET', path: `/api/periods?assignmentId=${NIL}` },
+  { method: 'PUT', path: `/api/periods/${NIL}`, body: { archived: true } },
   { method: 'GET', path: `/api/evaluations?sessionId=${NIL}` },
   { method: 'PUT', path: '/api/evaluations/bulk', body: { sessionId: NIL, entries: [] } },
+  { method: 'PUT', path: `/api/evaluations/${NIL}/archive`, body: { archived: true } },
   { method: 'GET', path: `/api/results?assignmentId=${NIL}&seq=1` },
   { method: 'GET', path: '/api/dashboard/trends' },
   { method: 'GET', path: `/api/dashboard/summary?assignmentId=${NIL}&seq=1` },
@@ -112,6 +115,7 @@ const ROUTES = [
   { method: 'DELETE', path: `/api/groups/${NIL}` },
   { method: 'GET', path: `/api/groups/${NIL}/members` },
   { method: 'PUT', path: `/api/groups/${NIL}/members`, body: { add: [], remove: [] } },
+  { method: 'PUT', path: `/api/groups/${NIL}/members/${NIL}`, body: { joinedOn: '2026-01-01' } },
   // Custom fields
   { method: 'GET', path: '/api/field-definitions' },
   { method: 'POST', path: '/api/field-definitions', body: {} },
@@ -132,6 +136,7 @@ const ROUTES = [
   { method: 'POST', path: '/api/task-templates', body: {} },
   { method: 'GET', path: '/api/alerts' },
   { method: 'POST', path: '/api/alerts/scan', body: {} },
+  { method: 'DELETE', path: `/api/alerts/${NIL}` },
   { method: 'GET', path: '/api/cafe/products' },
   { method: 'POST', path: '/api/cafe/products', body: {} },
   { method: 'GET', path: '/api/cafe/suppliers' },
@@ -181,7 +186,6 @@ let integrationDb;
 let closeRoleId;
 let closeUserId;
 let originalAlerts = [];
-let originalAuditIds = [];
 
 before(async () => {
   if (!RUN) return;
@@ -195,9 +199,6 @@ before(async () => {
        FROM alerts ORDER BY id`
     )
   ).rows;
-  originalAuditIds = (
-    await integrationDb.query(`SELECT id FROM audit_log ORDER BY id`)
-  ).rows.map((row) => row.id);
   admin = await loginAs(
     process.env.TEST_ADMIN_USERNAME ?? 'sample-admin',
     process.env.TEST_ADMIN_PASSWORD ?? 'sample-panel-2026'
@@ -261,10 +262,9 @@ after(async () => {
       `DELETE FROM user_sessions WHERE sess->>'userId' = $1`,
       [closeUserId]
     );
-    await integrationDb.query('DELETE FROM audit_log WHERE user_id = $1', [closeUserId]);
-    await integrationDb.query('DELETE FROM users WHERE id = $1', [closeUserId]);
+    // The audit trail is append-only; retain its actor in this throwaway DB.
+    await integrationDb.query('UPDATE users SET is_active=false WHERE id=$1', [closeUserId]);
   }
-  if (closeRoleId) await integrationDb.query('DELETE FROM roles WHERE id = $1', [closeRoleId]);
   await integrationDb.query(
     `DELETE FROM alerts WHERE id <> ALL($1::uuid[])`,
     [originalAlerts.map((row) => row.id)]
@@ -289,10 +289,6 @@ after(async () => {
       restore.release();
     }
   }
-  await integrationDb.query(
-    `DELETE FROM audit_log WHERE id <> ALL($1::bigint[])`,
-    [originalAuditIds]
-  );
   await integrationDb?.end();
 });
 
@@ -315,6 +311,9 @@ test('a signed-in viewer never gets a 401, and privileged routes stay closed to 
   // roles.manage, so staff gets 403 there too.
   const adminOnly = new Set([
     `DELETE /api/students/${NIL}`,
+    `PUT /api/students/${NIL}/restore`,
+    `PUT /api/periods/${NIL}`,
+    `DELETE /api/alerts/${NIL}`,
     'POST /api/students/import',
     'POST /api/parameters',
     `PATCH /api/parameters/${NIL}`,

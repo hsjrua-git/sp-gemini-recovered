@@ -6,7 +6,7 @@ export async function seedWorkflowDetails(db, { groupIds, studentIds }) {
   const root = (await db.query(`INSERT INTO student_groups (name, code) VALUES ('Sample School — مدرسه', 'sample-school') RETURNING id`)).rows[0];
   await db.query('UPDATE student_groups SET parent_id = $1 WHERE id = ANY($2::uuid[])', [root.id, groupIds]);
   const lab = (await db.query(`INSERT INTO student_groups (name, code, parent_id) VALUES ('Sample Lab — کارگاه', 'sample-lab', $1) RETURNING id`, [groupIds[0]])).rows[0];
-  await db.query(`INSERT INTO student_group_members (student_id, group_id, added_at) VALUES ($1, $2, current_date - 365)`, [studentIds[0], lab.id]);
+  await db.query(`INSERT INTO student_group_members (student_id, group_id, joined_on) VALUES ($1, $2, current_date - 365)`, [studentIds[0], lab.id]);
   await db.query(`UPDATE parameters SET parent_id = (SELECT id FROM parameters WHERE code = 'speed') WHERE code IN ('endurance', 'accuracy')`);
   await db.query(`UPDATE parameters SET parent_id = (SELECT id FROM parameters WHERE code = 'teamwork') WHERE code IN ('discipline', 'participation')`);
   const definition = parseChecklist([{ label: 'تمرین گرم‌کردن / Warm-up' }, { label: 'تمرین هدف / Target practice' }, { label: 'بازبینی جلسه / Session review' }]).value;

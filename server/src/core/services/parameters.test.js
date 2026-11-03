@@ -101,7 +101,7 @@ test('createParameter: validates, mints the sort order, and audits', async () =>
     );
 
     const audit = await pool.query(
-      "SELECT action, entity_id AS \"entityId\", new_data AS \"newData\" FROM audit_log WHERE action = 'parameter.create' ORDER BY id"
+      "SELECT action, entity_id AS \"entityId\", new_data AS \"newData\" FROM audit_log WHERE action = 'parameter.create' AND details->>'source' IS DISTINCT FROM 'database' ORDER BY id"
     );
     assert.equal(audit.rows.length, 2);
     assert.equal(audit.rows[0].entityId, first.id);
@@ -200,7 +200,7 @@ test('updateParameter: guards, snapshots, and the range lock', async () => {
 
     const audit = (
       await pool.query(
-        "SELECT old_data AS \"oldData\", new_data AS \"newData\" FROM audit_log WHERE action = 'parameter.update'"
+        "SELECT old_data AS \"oldData\", new_data AS \"newData\" FROM audit_log WHERE action = 'parameter.update' AND details->>'source' IS DISTINCT FROM 'database'"
       )
     ).rows[0];
     assert.equal(audit.oldData.name, 'Focus');
